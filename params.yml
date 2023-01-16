@@ -1,0 +1,18 @@
+game_options:
+  - prisoner
+  - trust
+  - dictator
+  - ultimatum
+mode_options:
+  - test_assumptions
+  - send_prompts
+game_assumption_filename:
+  prisoner: prisoner_assumptions_prompt
+  trust: trust_assumptions_prompt
+  dictator: dictator_assumptions_prompt
+  ultimatum: ultimatum_assumptions_prompt
+game_prompt_filename:
+  prisoner: prompt_test
+  trust: prompt_test
+  dictator: prompt_test
+  ultimatum: prompt_test
