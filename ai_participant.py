@@ -2,6 +2,7 @@
 # the Ai Participant sends a request to a ChatGPT model, obtains a response back and saves it
 # in tabular data form.
 
+import numpy as np
 import pandas as pd
 import os
 import openai
@@ -9,6 +10,13 @@ import itertools
 from dotenv import load_dotenv
 import argparse
 import yaml
+import re
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_random_exponential,
+)
+from sklearn.model_selection import ParameterGrid
 
 
 def load_yaml(filename):
@@ -19,15 +27,36 @@ def load_yaml(filename):
 
 class AiParticipant:
 
-    def __init__(self):
+    def __init__(self, game: str):
         """
         Initializes AiParticipant object
         """
+        # assert tests
+        assert game in general_params["game_options"], \
+            f'Game option not valid, must be one of {general_params["game_options"]}'
+
         # load environment variables
         load_dotenv()
         openai.api_key = os.environ["OPENAI_API_KEY"]
 
+        # load game specific params
+        self.game = game
+        self.game_params = load_yaml(f"./params/{game}_params.yml")
+
+
+        # TODO: integrate parameter grid
+        self.parameter_grid = {'temperature': [0.7, 0.8, 0.9],
+                               'max_tokens': [256],
+                               'top_p': [1],
+                               'frequency_penalty': [0],
+                               'presence_penalty': [0]
+                               }
+
+        #for g in ParameterGrid(self.parameter_grid):
+        #    print(g)
+
     @staticmethod
+    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
     def send_prompt(prompt):
         """
         This function sends a prompt to a specific language model with
@@ -47,8 +76,34 @@ class AiParticipant:
         )
 
         prompt_response = response["choices"][0]["text"].rstrip("\n")
-        print(prompt_response)
         return prompt_response
+
+    @staticmethod
+    def classify_answer(answer: str, game: str, stake=None):
+        """
+        This function attempts to classify the language model response
+        for a specific game prompt
+        TODO: so far only ultimatum, add other economic games
+        :param answer:
+        :param game:
+        :param stake:
+        :return:
+        """
+
+        if game == "ultimatum":
+            # extract the X amount of euros that the language model would keep for itself
+            # (from the first phrase of the answer text)
+            sentences = answer.split(".")
+            keep_pattern = re.compile("keep.*\d+")
+            give_pattern = re.compile("give.*\d+")
+            amount_give = [int(d) for d in re.findall(r'\d+', give_pattern.findall(sentences[0])[0])]
+            if len(keep_pattern.findall(sentences[0])) > 0:
+                amount_keep = [int(d) for d in re.findall(r'\d+', keep_pattern.findall(sentences[0])[0])]
+
+            if amount_give is None and amount_keep is not None:
+                return stake - amount_keep[0]
+            elif amount_give is not None:
+                return amount_give[0]
 
     def adjust_prompts(self, prompt_file: str):
         """
@@ -59,37 +114,20 @@ class AiParticipant:
         :param prompt_file: (str) the name of the file containing prompts for the specific economic game
         :return:
         """
-        # load prompts
-        self.prompt_df = pd.read_excel(os.path.join(prompts_dir, f"{prompt_file}.xlsx"))
 
-        self.person_type_options = ["stranger", "friend", "romantic partner"]
-        self.behaviour_type_options = ["selfish", "generous"]
+        row_list = []
+        factors = self.game_params["factors_names"]
+        factors_list = [self.game_params[f] for f in factors]
+        all_comb = list(itertools.product(*factors_list))
+        print(f"Number of combinations: {len(all_comb)}")
 
-        all_comb = list(itertools.product(self.person_type_options,
-                                          self.behaviour_type_options))
-        baseline_prompts = list(self.prompt_df['prompt_text'].unique())
+        for comb in all_comb:
+            prompt_params_dict = {factors[f]: comb[f] for f in range(len(factors))}
+            final_prompt = self.game_params["prompt_complete"].format(**prompt_params_dict)
+            row = [final_prompt] + [prompt_params_dict[f] for f in factors]
+            row_list.append(row)
 
-        # create elaborate prompts dataframe (created from a list of dicts)
-        rows_list = []
-
-        for baseline_prompt in baseline_prompts:
-            for comb in all_comb:
-                prompt_params_dict = {
-                    'person_type': comb[0],
-                    'behavior_type': comb[1]
-                }
-                final_prompt = baseline_prompt.format(**prompt_params_dict)
-
-                rows_list.append([
-                    baseline_prompt,
-                    prompt_params_dict["person_type"],
-                    prompt_params_dict["behavior_type"],
-                    final_prompt,
-                ])
-
-        add_df = pd.DataFrame(rows_list, columns=list(self.prompt_df.columns))
-        self.prompt_df = pd.concat([self.prompt_df, add_df], ignore_index=True)
-        self.prompt_df.to_csv(os.path.join(prompts_dir, f"{prompt_file}_intermediate.csv"))
+        self.prompt_df = pd.DataFrame(row_list, columns=list(["prompt"]+factors))
 
     def test_assumptions(self, prompt_file: str):
         """
@@ -99,9 +137,14 @@ class AiParticipant:
         :param prompt_file: (str) the name of the file containing assumption prompts for the specific economic game
         :return:
         """
-        self.assumption_prompt_df = pd.read_excel(os.path.join(prompts_dir, f"{prompt_file}.xlsx"))
-        self.assumption_prompt_df["answer_text"] = self.assumption_prompt_df["prompt_text"].apply(self.send_prompt)
-        self.assumption_prompt_df.to_csv(os.path.join(prompts_dir, f"{prompt_file}_answers.csv"))
+
+        sanity_row_list = []
+        for q in self.game_params["sanity_questions"]:
+            sanity_row_list.append(self.game_params["prompt_sanity_check"]+' '+q)
+
+        self.assumption_prompt_df = pd.DataFrame(sanity_row_list, columns=["sanity_check_text"])
+        self.assumption_prompt_df["answer_text"] = self.assumption_prompt_df["sanity_check_text"].apply(self.send_prompt)
+        self.assumption_prompt_df.to_csv(os.path.join(prompts_dir, f"{self.game}sanity_check_answers.csv"))
 
     def collect_answers(self):
         """
@@ -109,11 +152,22 @@ class AiParticipant:
         collects the response and saves it in csv file
         :return:
         """
-        self.prompt_df["answer_text"] = self.prompt_df["final_prompt_text"].apply(self.send_prompt)
-        self.prompt_df.to_csv(os.path.join(prompts_dir, f"prompt_test_final.csv"))
+        # retrieve answer text
+        self.prompt_df["answer_text"] = self.prompt_df["prompt"].apply(self.send_prompt)
+        # classification of answer
+        if self.game == "ultimatum":
+            self.prompt_df['money_give'] = self.prompt_df.apply(lambda x: self.classify_answer(x['answer_text'],
+                                                                                               self.game,
+                                                                                               x['stake']), axis=1)
+            self.prompt_df['is_fair'] = np.where(self.prompt_df['money_give'] == (self.prompt_df['stake']/2),
+                                                 True,
+                                                 False)
+
+        self.prompt_df.to_csv(os.path.join(prompts_dir, f"{self.game}_final2.csv"))
 
 
 if __name__ == "__main__":
+
     # parse arguments
     parser = argparse.ArgumentParser(description='Run ChatGPT AI participant for economic games')
     parser.add_argument('--game',
@@ -127,19 +181,18 @@ if __name__ == "__main__":
 
     # collect args and make assert tests
     args = parser.parse_args()
-    solve_params = load_yaml("./params.yml")
-    print(solve_params["game_assumption_filename"])
-    assert args.game in solve_params["game_options"], f'Game option must be one of {solve_params["game_options"]}'
-    assert args.mode in solve_params["mode_options"], f'Mode option must be one of {solve_params["mode_options"]}'
+    general_params = load_yaml("params/params.yml")
+    assert args.game in general_params["game_options"], f'Game option must be one of {general_params["game_options"]}'
+    assert args.mode in general_params["mode_options"], f'Mode option must be one of {general_params["mode_options"]}'
 
     # directory structure
     prompts_dir = '../prompts'
 
     # initialize AiParticipant object
-    P = AiParticipant()
+    P = AiParticipant(args.game)
 
-    if args.mode == 'test_assumptions':
-        P.test_assumptions(solve_params["game_assumption_filename"][args.game])
+    # if args.mode == 'test_assumptions':
+    #     P.test_assumptions(general_params["game_assumption_filename"][args.game])
     if args.mode == 'send_prompts':
-        P.adjust_prompts(solve_params["game_assumption_filename"][args.game])
+        P.adjust_prompts(general_params["game_assumption_filename"][args.game])
         P.collect_answers()
