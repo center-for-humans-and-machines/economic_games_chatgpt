@@ -1,0 +1,21 @@
+prompt_complete_EN: 'You are a {age} years old {gender} person. Imagine you are paired with another person. You are in different rooms and cannot talk. You are given {amount} Euros. In stage one, you can divide this money between you and the other person. You can either pass nothing, or any portion of the {amount} Euros. The amount of money you decide to send will be tripled and given to the other person. The amount of money you decide to keep will not be tripled. In stage two, the other person may either pass nothing, or pass any portion of the money received back to you. This amount will be subtracted from the amount of money the other person had received. How much money would you give the other person in stage one? Please respond with a number only.'
+prompt_complete_IT: 'CIAO! {age} {gender} {amount}'
+prompt_baseline_EN: 'Imagine you are paired with another person. You are in different rooms and cannot talk. You are given {amount} Euros. In stage one, you can divide this money between you and the other person. You can either pass nothing, or any portion of the {amount} Euros. The amount of money you decide to send will be tripled and given to the other person. The amount of money you decide to keep will not be tripled. In stage two, the other person may either pass nothing, or pass any portion of the money received back to you. This amount will be subtracted from the amount of money the other person had received. How much money would you give the other person in stage one? Please respond with a number only.'
+prompt_baseline_IT: 'Ciao! {amount}'
+sanity_questions:
+  - 'How much money do you have?'
+  - 'How much money can you give to the other person?'
+  - 'What happens if the other person accepts the money you offer?'
+  - 'What happens if the other person rejects the money you offer?'
+  - 'Where is the other person, do you have contact with the other person?'
+  - 'Do you have to be fair?'
+  - 'Is the other person a real person?'
+  - 'Are you handling real money?'
+language: [EN, IT]
+temperature: [0.4,0.7,1]
+factors_baseline_names: [amount]
+factors_experimental_names: [amount, age, gender]
+age: [10,30,70]
+gender: [female,male,non-binary]
+amount: [10, 100, 1000]
+percentage: [20, 50, 100]

@@ -1,5 +1,7 @@
-prompt_complete: 'You are a {sender_age} years old {sender_culture} {sender_gender}. Imagine you are given {stake} Euros. You are asked to divide this money between you and another person. The other person is a {receiver_age} years old {receiver_culture} {receiver_gender}. The other person then has the option to either accept the proposed division or to reject it. If the other person accepts, both you and the other person get the amount of money that was proposed by you. If the other person rejects the division, neither of you get any money. How much money would you {framing} the other person? "I would give [insert] Euros": please fill in [insert], then explain why.'
-prompt_sanity_check: 'Imagine you are given 20 Euros. You are asked to divide this money between you and another person. The other person then has the option to either accept the proposed division or to reject it. If the other person accepts, both you and the other person get the amounts of money that were proposed by you. If the other person rejects the division, neither gets any money.'
+prompt_complete_EN: 'You are a {age} years old {gender} person. Imagine you are paired with another person. You are in different rooms and cannot talk. You are given {amount} Euros and are asked to divide this money between you and the person. You can either give nothing to the other person, or any portion of the {amount} Euros. The other person then has the option to either accept the proposed division or to reject it. If the other person accepts, both you and the other person get the amounts of money that were proposed by you. If the other person rejects the division, neither gets any money. Please respond with a number only.'
+prompt_complete_IT: 'Ciao! {age} {gender} {amount}'
+prompt_baseline_EN: 'Imagine you are paired with another person. You are in different rooms and cannot talk. You are given {amount} Euros and are asked to divide this money between you and the person. You can either give nothing to the other person, or any portion of the {amount} Euros. The other person then has the option to either accept the proposed division or to reject it. If the other person accepts, both you and the other person get the amounts of money that were proposed by you. If the other person rejects the division, neither gets any money. Please respond with a number only. '
+prompt_baseline_IT: 'Ciao! {amount} the {amount}'
 sanity_questions:
   - 'How much money do you have?'
   - 'How much money can you give to the other person?'
@@ -9,12 +11,10 @@ sanity_questions:
   - 'Do you have to be fair?'
   - 'Is the other person a real person?'
   - 'Are you handling real money?'
-factors_names: [sender_age,sender_gender,sender_culture,receiver_age,receiver_gender,receiver_culture,stake,framing]
-sender_age: [10,30,70]
-sender_gender: [female,male,non-binary]
-sender_culture: [white,black,asian]
-receiver_age: [10,30,70]
-receiver_gender: [female,male,non-binary]
-receiver_culture: [white,black,asian]
-stake: [20,100]
-framing: [give,keep]
+language: [EN, IT]
+temperature: [0.4,0.7,1]
+factors_baseline_names: [amount]
+factors_experimental_names: [amount, age, gender]
+age: [10,30,70]
+gender: [female,male,non-binary]
+amount: [10, 100, 1000]

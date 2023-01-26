@@ -1,0 +1,21 @@
+prompt_complete_EN: 'You are a {age} years old {gender} person. Imagine you are paired with another person. You are in different rooms and cannot talk. You are the receiver and the other person is the sender. As the sender, the other person is given {amount} Euros. In stage one, the sender can divide this money between you and them. The sender can either pass nothing, or any portion of the {amount} Euros. The amount of money the sender decides to send will be tripled and given to you. The amount of money the sender decides to keep will not be tripled. In stage two, you may either pass nothing, or pass any portion of the money you received back to the sender. This amount will be subtracted from the amount of money you have received. The sender sends you {amount}*{percentage} Euros. How much money would you send back? Please respond with a number only.'
+prompt_complete_IT: 'Ciao! {amount} {percentage} {age} {gender}'
+prompt_baseline_EN: 'Imagine you are paired with another person. You are in different rooms and cannot talk. You are the receiver and the other person is the sender. As the sender, the other person is given {amount} Euros. In stage one, the sender can divide this money between you and them. The sender can either pass nothing, or any portion of the {amount} Euros. The amount of money the sender decides to send will be tripled and given to you. The amount of money the sender decides to keep will not be tripled. In stage two, you may either pass nothing, or pass any portion of the money you received back to the sender. This amount will be subtracted from the amount of money you have received. The sender sends you {amount}*{percentage} Euros. How much money would you send back? Please respond with a number only.'
+prompt_baseline_IT: 'Ciao! {amount} {percentage}'
+sanity_questions:
+  - 'How much money do you have?'
+  - 'How much money can you give to the other person?'
+  - 'What happens if the other person accepts the money you offer?'
+  - 'What happens if the other person rejects the money you offer?'
+  - 'Where is the other person, do you have contact with the other person?'
+  - 'Do you have to be fair?'
+  - 'Is the other person a real person?'
+  - 'Are you handling real money?'
+language: [EN, IT]
+temperature: [0.4,0.7,1]
+factors_baseline_names: [amount, percentage]
+factors_experimental_names: [amount, percentage, age, gender]
+age: [10,30,70]
+gender: [female,male,non-binary]
+amount: [10, 100, 1000]
+percentage: [20, 50, 100]
