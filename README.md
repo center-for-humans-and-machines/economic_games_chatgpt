@@ -30,10 +30,11 @@ OPENAI_API_KEY=<your_api_key_here>
 In order to run the analysis script `ai_participant.py` specify the economic game and the action you want to perform.
 Economic game can be one of the following options:
 
-* `prisoner`
-* `ultimatum`
+* `ultimatum_sender` (sender perspective)
+* `ultimatum_receiver` (receiver perspective)
 * `dictator`
-* `trust`
+* `trust_sender` (sender perspective)
+* `trust_receiver` (receiver perspective)
 
 The action to perform can be one of the following options:
 
@@ -44,3 +45,18 @@ E.g. run the script on the prisoner dilemma game, send all prompts to the langua
 ```
 (.venv) python ai_participant.py --game prisoner --mode send_prompts
 ```
+
+## Factor Levels for prompts
+
+### Across all games, baseline and experimental prompts
+| Parameter Name | Type  | Levels                              |
+|----------------|-------|-------------------------------------|
+| Temperature    | float | [0.4, 0.7, 1] (low, medium, high)   |
+| Language       | str   | [EN, ...]                           |
+| Amount         | int   | [10, 100, 1000] (low, medium, high) |
+
+### Across all games, experimental prompts
+| Parameter Name | Type | Levels                           |
+|----------------|------|----------------------------------|
+| Age            | int  | [20, 50, 70] (low, medium, high) |
+| Gender         | str  | [male, female, non-binary]       |
