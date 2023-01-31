@@ -1,7 +1,9 @@
 prompt_complete_EN: 'You are a {age} years old {gender} person. Imagine another person is given {amount} Euros. This person is asked to divide this money between you and them. You and the other person are in different rooms and cannot talk. You have the option to either accept the proposed division or to reject it. If you accept, both you and the other person get the amounts of money that were proposed by the other person. If you reject the division, neither gets any money. The other person sends you {amount}*{percentage} Euros. Would you accept? Please answer with yes or no.'
 prompt_complete_IT: 'Ciao! {age} {gender} {amount} {percentage}'
 prompt_baseline_EN: 'Imagine another person is given {amount} Euros. This person is asked to divide this money between you and them. You and the other person are in different rooms and cannot talk. You have the option to either accept the proposed division or to reject it. If you accept, both you and the other person get the amounts of money that were proposed by the other person. If you reject the division, neither gets any money. The other person sends you {amount}*{percentage} Euros. Would you accept? Please answer with yes or no.'
+prompt_baseline_followup_EN: 'Please answer the following: My gender is INSERT: fill in INSERT with one option among male, female or non-binary. I am INSERT years old: fill in INSERT with a number'
 prompt_baseline_IT: 'Ciao! {amount} {percentage}'
+prompt_baseline_followup_IT: "Per favore rispondi: Il mio genere è INSERT: completa INSERT con un'opzione tra maschio, femmina o non-binary. Ho INSERT anni: completa INSERT con un numero."
 sanity_questions:
   - 'How much money do you have?'
   - 'How much money can you give to the other person?'
