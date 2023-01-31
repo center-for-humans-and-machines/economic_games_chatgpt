@@ -41,12 +41,17 @@ The action to perform can be one of the following options:
 * `test_assumptions` (this action sends prompts that test the language model's knowledge of the selected game and checks for the assumptions that the language model has on the game dynamics)
 * `send_prompts` (this action sends prompts for a specific game)
 
-E.g. run the script on the prisoner dilemma game, send all prompts to the language model and save responses
+E.g. run the script on the trust game from the sender perspective, send all prompts to the language model and save responses
 ```
-(.venv) python ai_participant.py --game prisoner --mode send_prompts
+(.venv) python ai_participant.py --game trust_sender --mode send_prompts
 ```
 
 ## Factor Levels for prompts
+
+For each game a parameter file in the `params` folder of the repository is created.
+The parameter file contains all prompts used in the study, organized by different languages and by prompt type (baseline or experimental).
+Additionally, the parameter file includes all factors and language model parameters that are used in the study.
+Parameters used include:
 
 ### Across all games, baseline and experimental prompts
 | Parameter Name | Type  | Levels                              |
