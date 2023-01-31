@@ -180,6 +180,56 @@ class AiParticipant:
             self.send_prompt)
         self.assumption_prompt_df.to_csv(os.path.join(prompts_dir, f"{self.game}_sanity_check_answers.csv"))
 
+    @staticmethod
+    def build_followup_baseline_prompt(prompt, answer, language, game_params):
+        return prompt + '\n' + answer + '\n' + game_params[f'prompt_baseline_followup_{language}']
+
+    def obtain_baseline_info(self):
+        """
+        This method sends an additional prompt to the language model for baseline condition.
+        The prompt is made of the previous model answer + a follow-up question to obtain
+        demographic info.
+        :return:
+        """
+
+        # create new columns for baseline prompts only
+        self.prompt_df['baseline_followup'] = None
+        self.prompt_df['baseline_followup'] = self.prompt_df[self.prompt_df['prompt_type'] == 'baseline'].apply(
+            lambda x:
+            self.build_followup_baseline_prompt(self.prompt_df["prompt"],
+                                                self.prompt_df["answer_text"],
+                                                self.prompt_df["language"],
+                                                self.game_params),
+            axis=1)
+
+        # obtain answer (language is already set, we specify the temperature parameter)
+        self.prompt_df['baseline_followup_answer'] = None
+        self.prompt_df['baseline_followup_answer'] = self.prompt_df[self.prompt_df['prompt_type'] == 'baseline'].apply(
+            lambda x: self.send_prompt(self.prompt_df["baseline_followup"],
+                                       self.prompt_df["temperature"]),
+            axis=1)
+
+        # convert column to string
+        self.prompt_df['baseline_followup_answer'] = self.prompt_df['baseline_followup_answer'].astype(str)
+
+        # separate gender and age phrases into two temporary columns
+        self.prompt_df[['temp_gender', 'temp_age']] = self.prompt_df[self.prompt_df['prompt_type'] == 'baseline'][
+            'baseline_followup_answer'].str.split(pat='.',
+                                                  expand=True)
+
+        # extract gender
+        self.prompt_df.loc[self.prompt_df['prompt_type'] == 'baseline', 'gender'] = \
+            self.prompt_df[self.prompt_df['prompt_type'] == 'baseline']['temp_gender'].str.partition('is ')[
+                2].str.extract(
+                r"([^0-9]+)", expand=False)
+        # extract age
+        self.prompt_df.loc[self.prompt_df['prompt_type'] == 'baseline', 'age'] = \
+            self.prompt_df[self.prompt_df['prompt_type'] == 'baseline']['temp_age'].str.extract(
+                r"(\d{1,3})", expand=False).astype(int)
+
+        # remove temp columns
+        self.prompt_df.drop(['temp_age', 'temp_gender'], axis=1, inplace=True)
+
     def collect_answers(self):
         """
         This function sends a request to an openai language model,
@@ -190,6 +240,9 @@ class AiParticipant:
         self.prompt_df["answer_text"] = self.prompt_df.apply(lambda x: self.send_prompt(self.prompt_df["prompt"],
                                                                                         self.prompt_df["temperature"]),
                                                              axis=1)
+
+        # for baseline prompts: obtain demographic info after answer
+        self.obtain_baseline_info(self.prompt_df[self.prompt_df['prompt_type'] == 'baseline'])
 
         # classification of answer
         if self.game == "ultimatum_sender":
@@ -206,14 +259,23 @@ class AiParticipant:
 if __name__ == "__main__":
 
     # parse arguments
-    parser = argparse.ArgumentParser(description='Run ChatGPT AI participant for economic games')
+    parser = argparse.ArgumentParser(description="""
+                                                 Run ChatGPT AI participant for economic games
+                                                 (Center for Humans and Machines, Max Planck Institute for Human Development)
+                                                 """)
     parser.add_argument('--game',
                         type=str,
-                        help='Which economic game do you want to run',
+                        help="""
+                                Which economic game do you want to run \n 
+                                (options: trust_sender, trust_receive, dictator, ultimatum_sender, ultimatum_receiver)
+                                """,
                         required=True)
     parser.add_argument('--mode',
                         type=str,
-                        help='What type of action do you want to run',
+                        help="""
+                                What type of action do you want to run \n 
+                                (options: test_assumptions, send_prompts)
+                                """,
                         required=True)
 
     # collect args and make assert tests
@@ -232,5 +294,6 @@ if __name__ == "__main__":
     #     P.test_assumptions(general_params["game_assumption_filename"][args.game])
 
     if args.mode == 'send_prompts':
-        P.adjust_prompts()
+        print('Work in progress')
+        #P.adjust_prompts()
         # P.collect_answers()
