@@ -1,7 +1,9 @@
 prompt_complete_EN: 'You are a {age} years old {gender} person. Imagine you are paired with another person. You are in different rooms and cannot talk. You are given {amount} Euros. You can divide this money between you and another person. You and the other person are in different rooms and cannot talk. You can choose to keep the {amount} Euros to yourself or you can give up to the entire amount to the other person. How much money would you give the other person? Please respond with a number only.'
 prompt_complete_IT: 'Ciao! {age} {gender} {amount}'
 prompt_baseline_EN: 'Imagine you are paired with another person. You are in different rooms and cannot talk. You are given {amount} Euros. You can divide this money between you and another person. You and the other person are in different rooms and cannot talk. You can choose to keep the {amount} Euros to yourself or you can give up to the entire amount to the other person. How much money would you give the other person? Please respond with a number only. '
+prompt_baseline_followup_EN: 'Please answer the following: My gender is *INSERT*: fill in *INSERT* with one option among male, female or non-binary. I am *INSERT* years old: fill in *INSERT* with a number'
 prompt_baseline_IT: 'Ciao! {amount}'
+prompt_baseline_followup_IT: "Per favore rispondi: Il mio genere è *INSERT*: completa *INSERT* con un'opzione tra maschio, femmina o non-binary. Ho *INSERT* anni: completa *INSERT* con un numero."
 sanity_questions:
   - 'How much money do you have?'
   - 'How much money can you give to the other person?'
