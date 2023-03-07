@@ -74,40 +74,45 @@ class AiParticipant:
         """
         This function attempts to classify the language model response
         for a specific game prompt
-        TODO: so far only ultimatum, add other economic games
+
         :param answer: the answer received from the LM
         :param game: the game type we are examining
         :param amount: the amount of money that the question prompt used
         :return:
         """
 
-        if game == "trust_receiver":
-            # Yes or No type of answer
+        if game == 'dictator_sender' or game == 'ultimatum_sender' or game == 'dictator_sequential':
+            # how much money would you give, respond with number only
+            give = [int(d) for d in re.findall(r'\d+', answer)]
+            return give[0]
+
+        if game == 'dictator_receiver' or game == 'ultimatum_receiver':
+            # do you think this is fair, answer with yes or no
             sentences = answer.split("")
             return sentences[0]
 
-        if game == "trust_sender":
-            # extract the X amount of euros that the language model would send to other person
-            sentences = answer.split("")
-            give_pattern = re.compile("give.*\d+")
-            amount_give = [int(d) for d in re.findall(r'\d+', give_pattern.findall(sentences[0])[0])]
-            if amount_give is not None:
-                return amount_give[0]
+        # if game == "trust_sender":
+        #     # extract the X amount of euros that the language model would send to other person
+        #     sentences = answer.split("")
+        #     give_pattern = re.compile("give.*\d+")
+        #     amount_give = [int(d) for d in re.findall(r'\d+', give_pattern.findall(sentences[0])[0])]
+        #     if amount_give is not None:
+        #         return amount_give[0]
 
-        if game == "ultimatum_sender":
-            # extract the X amount of euros that the language model would give/keep for itself
-            # (from the first phrase of the answer text)
-            sentences = answer.split(".")
-            keep_pattern = re.compile("keep.*\d+")
-            give_pattern = re.compile("give.*\d+")
-            amount_give = [int(d) for d in re.findall(r'\d+', give_pattern.findall(sentences[0])[0])]
-            if len(keep_pattern.findall(sentences[0])) > 0:
-                amount_keep = [int(d) for d in re.findall(r'\d+', keep_pattern.findall(sentences[0])[0])]
-
-            if amount_give is None and amount_keep is not None:
-                return amount - amount_keep[0]
-            elif amount_give is not None:
-                return amount_give[0]
+        # if game == "ultimatum_sender":
+        #     # extract the X amount of euros that the language model would give/keep for itself
+        #     # (from the first phrase of the answer text)
+        #     sentences = answer.split(".")
+        #     keep_pattern = re.compile("keep.*\d+")
+        #     give_pattern = re.compile("give.*\d+")
+        #     amount_give = [int(d) for d in re.findall(r'\d+', give_pattern.findall(sentences[0])[0])]
+        #     if len(keep_pattern.findall(sentences[0])) > 0:
+        #         amount_keep = [int(d) for d in re.findall(r'\d+', keep_pattern.findall(sentences[0])[0])]
+        #
+        #     if amount_give is None and amount_keep is not None:
+        #         return amount - amount_keep[0]
+        #     elif amount_give is not None:
+        #         return amount_give[0]
 
     def adjust_prompts(self):
         """
@@ -125,7 +130,8 @@ class AiParticipant:
         factors_list_b = [self.game_params[f] for f in factors_b]
         all_comb_b = list(itertools.product(*factors_list_b))
         print(f"Number of combinations (baseline): {len(all_comb_b)}")
-        for t in self.game_params['temperature']:
+
+        for t in self.game_params['temperature_baseline']:
             for l in self.game_params['language']:
                 for comb in all_comb_b:
                     prompt_params_dict = {factors_b[f]: comb[f] for f in range(len(factors_b))}
@@ -138,25 +144,27 @@ class AiParticipant:
         baseline_df['gender'] = None
         baseline_df['prompt_type'] = 'baseline'
 
-        # experimental prompts
-        row_list_e = []
-        factors_e = self.game_params["factors_experimental_names"]
-        factors_list_e = [self.game_params[f] for f in factors_e]
-        all_comb_e = list(itertools.product(*factors_list_e))
-        print(f"Number of combinations (experimental): {len(all_comb_e)}")
-        for t in self.game_params['temperature']:
-            for l in self.game_params['language']:
-                for comb in all_comb_e:
-                    prompt_params_dict = {factors_e[f]: comb[f] for f in range(len(factors_e))}
-                    final_prompt = self.game_params[f"prompt_complete_{l}"].format(**prompt_params_dict)
-                    row = [final_prompt] + [t] + [l] + [prompt_params_dict[f] for f in factors_e]
-                    row_list_e.append(row)
-
-        experimental_df = pd.DataFrame(row_list_e, columns=list(["prompt", "temperature", "language"] + factors_e))
-        experimental_df['prompt_type'] = 'experimental'
-
-        # create prompt df with all combinations for baseline and experimental
-        self.prompt_df = pd.concat([baseline_df, experimental_df], axis=0)
+        # # experimental prompts
+        # row_list_e = []
+        # factors_e = self.game_params["factors_experimental_names"]
+        # factors_list_e = [self.game_params[f] for f in factors_e]
+        # all_comb_e = list(itertools.product(*factors_list_e))
+        # print(f"Number of combinations (experimental): {len(all_comb_e)}")
+        #
+        # for t in self.game_params['temperature']:
+        #     for l in self.game_params['language']:
+        #         for comb in all_comb_e:
+        #             prompt_params_dict = {factors_e[f]: comb[f] for f in range(len(factors_e))}
+        #             final_prompt = self.game_params[f"prompt_complete_{l}"].format(**prompt_params_dict)
+        #             row = [final_prompt] + [t] + [l] + [prompt_params_dict[f] for f in factors_e]
+        #             row_list_e.append(row)
+        #
+        # experimental_df = pd.DataFrame(row_list_e, columns=list(["prompt", "temperature", "language"] + factors_e))
+        # experimental_df['prompt_type'] = 'experimental'
+        #
+        # # create prompt df with all combinations for baseline and experimental
+        # self.prompt_df = pd.concat([baseline_df, experimental_df], axis=0)
+        self.prompt_df = baseline_df
         self.prompt_df['game_type'] = self.game
 
         # save intermediate prompts
@@ -173,7 +181,7 @@ class AiParticipant:
 
         sanity_row_list = []
         for q in self.game_params["sanity_questions"]:
-            sanity_row_list.append(self.game_params["prompt_baseline"] + ' ' + q)
+            sanity_row_list.append(self.game_params["prompt_baseline_EN"] + ' ' + q)
 
         self.assumption_prompt_df = pd.DataFrame(sanity_row_list, columns=["sanity_check_text"])
         self.assumption_prompt_df["answer_text"] = self.assumption_prompt_df["sanity_check_text"].apply(
@@ -261,20 +269,22 @@ if __name__ == "__main__":
     # parse arguments
     parser = argparse.ArgumentParser(description="""
                                                  Run ChatGPT AI participant for economic games
-                                                 (Center for Humans and Machines, Max Planck Institute for Human Development)
+                                                 (Center for Humans and Machines, 
+                                                 Max Planck Institute for Human Development)
                                                  """)
     parser.add_argument('--game',
                         type=str,
                         help="""
                                 Which economic game do you want to run \n 
-                                (options: trust_sender, trust_receive, dictator, ultimatum_sender, ultimatum_receiver)
+                                (options: dictator_sequential, dictator_sender, dictator_receiver, 
+                                ultimatum_sender, ultimatum_receiver)
                                 """,
                         required=True)
     parser.add_argument('--mode',
                         type=str,
                         help="""
                                 What type of action do you want to run \n 
-                                (options: test_assumptions, send_prompts)
+                                (options: test_assumptions, send_prompts_baseline, send_prompts_experimental)
                                 """,
                         required=True)
 
@@ -293,7 +303,7 @@ if __name__ == "__main__":
     # if args.mode == 'test_assumptions':
     #     P.test_assumptions(general_params["game_assumption_filename"][args.game])
 
-    if args.mode == 'send_prompts':
-        print('Work in progress')
-        #P.adjust_prompts()
+    if args.mode == 'send_prompts_baseline':
+        #print('Work in progress')
+        P.adjust_prompts()
         # P.collect_answers()
