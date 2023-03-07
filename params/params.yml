@@ -1,9 +1,10 @@
 game_options:
-  - trust_sender
-  - trust_receiver
-  - dictator
+  - dictator_sender
+  - dictator_receiver
+  - dictator_sequential
   - ultimatum_sender
   - ultimatum_receiver
 mode_options:
   - test_assumptions
-  - send_prompts
+  - send_prompts_baseline
+  - send_prompts_experimental

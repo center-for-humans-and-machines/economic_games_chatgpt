@@ -1,9 +1,6 @@
 prompt_complete_EN: 'You are a {age} years old {gender} person. Imagine you are paired with another person. You are in different rooms and cannot talk. You are given {amount} Euros. You can divide this money between you and another person. You and the other person are in different rooms and cannot talk. You can choose to keep the {amount} Euros to yourself or you can give up to the entire amount to the other person. How much money would you give the other person? Please respond with a number only.'
-prompt_complete_IT: 'Ciao! {age} {gender} {amount}'
-prompt_baseline_EN: 'Imagine you are paired with another person. You are in different rooms and cannot talk. You are given {amount} Euros. You can divide this money between you and another person. You and the other person are in different rooms and cannot talk. You can choose to keep the {amount} Euros to yourself or you can give up to the entire amount to the other person. How much money would you give the other person? Please respond with a number only. '
+prompt_baseline_EN: 'Imagine you (person A) are paired with another person (person B). You are in different rooms and cannot talk. Person B is given {amount} Euros. This person is asked to divide this money between you (person A) and them. Person B can choose to keep the {amount} Euros to themself or they can give up to the entire amount to you. Person B sends you {share} Euros. Do you think that this is fair? Please answer with yes or no.'
 prompt_baseline_followup_EN: 'Please answer the following: My gender is *INSERT*: fill in *INSERT* with one option among male, female or non-binary. I am *INSERT* years old: fill in *INSERT* with a number'
-prompt_baseline_IT: 'Ciao! {amount}'
-prompt_baseline_followup_IT: "Per favore rispondi: Il mio genere è *INSERT*: completa *INSERT* con un'opzione tra maschio, femmina o non-binary. Ho *INSERT* anni: completa *INSERT* con un numero."
 sanity_questions:
   - 'How much money do you have?'
   - 'How much money can you give to the other person?'
@@ -13,10 +10,12 @@ sanity_questions:
   - 'Do you have to be fair?'
   - 'Is the other person a real person?'
   - 'Are you handling real money?'
-language: [EN, IT]
+language: [EN]
+temperature_baseline: [0]
 temperature: [0.4,0.7,1]
-factors_baseline_names: [amount]
-factors_experimental_names: [amount, age, gender]
+factors_baseline_names: [amount, share]
+factors_experimental_names: [amount, share, age, gender]
 age: [10,30,70]
 gender: [female,male,non-binary]
-amount: [10, 100, 1000]
+amount: [10]
+share: [2,5,10]

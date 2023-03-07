@@ -1,9 +1,6 @@
 prompt_complete_EN: 'You are a {age} years old {gender} person. Imagine you are paired with another person. You are in different rooms and cannot talk. You are given {amount} Euros and are asked to divide this money between you and the person. You can either give nothing to the other person, or any portion of the {amount} Euros. The other person then has the option to either accept the proposed division or to reject it. If the other person accepts, both you and the other person get the amounts of money that were proposed by you. If the other person rejects the division, neither gets any money. Please respond with a number only.'
-prompt_complete_IT: 'Ciao! {age} {gender} {amount}'
 prompt_baseline_EN: 'Imagine you are paired with another person. You are in different rooms and cannot talk. You are given {amount} Euros and are asked to divide this money between you and the person. You can either give nothing to the other person, or any portion of the {amount} Euros. The other person then has the option to either accept the proposed division or to reject it. If the other person accepts, both you and the other person get the amounts of money that were proposed by you. If the other person rejects the division, neither gets any money. Please respond with a number only. '
 prompt_baseline_followup_EN: 'Please answer the following: My gender is *INSERT*: fill in *INSERT* with one option among male, female or non-binary. I am *INSERT* years old: fill in *INSERT* with a number'
-prompt_baseline_IT: 'Ciao! {amount} the {amount}'
-prompt_baseline_followup_IT: "Per favore rispondi: Il mio genere è *INSERT*: completa *INSERT* con un'opzione tra maschio, femmina o non-binary. Ho *INSERT* anni: completa *INSERT* con un numero."
 sanity_questions:
   - 'How much money do you have?'
   - 'How much money can you give to the other person?'
@@ -13,10 +10,11 @@ sanity_questions:
   - 'Do you have to be fair?'
   - 'Is the other person a real person?'
   - 'Are you handling real money?'
-language: [EN, IT]
+language: [EN]
+temperature_baseline: [0]
 temperature: [0.4,0.7,1]
 factors_baseline_names: [amount]
 factors_experimental_names: [amount, age, gender]
 age: [10,30,70]
 gender: [female,male,non-binary]
-amount: [10, 100, 1000]
+amount: [10]
