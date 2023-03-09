@@ -6,5 +6,9 @@ game_options:
   - ultimatum_receiver
 mode_options:
   - test_assumptions
+  - prepare_prompts
   - send_prompts_baseline
   - send_prompts_experimental
+model_options:
+  - chatgpt
+  - davinci

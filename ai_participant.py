@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import os
 import openai
+import tiktoken
 import requests
 import itertools
 from dotenv import load_dotenv
@@ -29,13 +30,12 @@ def load_yaml(filename):
 
 class AiParticipant:
 
-    def __init__(self, game: str):
+    def __init__(self, game: str, model: str):
         """
-        Initializes AiParticipant object
+        Initialzes AIParticipant object
+        :param game: the economic game
+        :param model: the openai model to use
         """
-        # assert tests
-        assert game in general_params["game_options"], \
-            f'Game option not valid, must be one of {general_params["game_options"]}'
 
         # load environment variables
         load_dotenv()
@@ -45,28 +45,77 @@ class AiParticipant:
         self.game = game
         self.game_params = load_yaml(f"./params/{game}.yml")
 
+        # define OpenAI model to use during experiment
+        self.model_code = model
+
     @staticmethod
-    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-    def send_prompt(prompt: str, temp: float):
+    def count_num_tokens(prompt: str, model_code: str):
         """
-        This function sends a prompt to a specific language model with
-        specific parameters.
-        :param prompt: the propt text
-        :param temp: the temperature model parameter value to use
+        This function counts the number of tokens a prompt is mad eof for different models.
+        Adapted from https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
+        :param prompt:
+        :param model_code:
         :return:
         """
 
-        response = openai.Completion.create(
-            model="text-davinci-003",
-            prompt=prompt,
-            temperature=temp,
-            max_tokens=256,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0
-        )
+        model_dict = {'davinci': 'text-davinci-003', 'chatgpt': 'gpt-3.5-turbo'}
+        model = model_dict[model_code]
+        try:
+            encoding = tiktoken.encoding_for_model(model)
+        except KeyError:
+            encoding = tiktoken.get_encoding("cl100k_base")
 
-        prompt_response = response["choices"][0]["text"].rstrip("\n")
+        if model == 'text-davinci-003':
+            num_tokens = len(encoding.encode(prompt))
+            return num_tokens
+
+        if model == "gpt-3.5-turbo":
+            num_tokens = 0
+            messages = [{"role": "user", "content": prompt}]
+            for message in messages:
+                num_tokens += 4  # every message follows <im_start>{role/name}\n{content}<im_end>\n
+                for key, value in message.items():
+                    num_tokens += len(encoding.encode(value))
+                    if key == "name":  # if there's a name, the role is omitted
+                        num_tokens += -1  # role is always required and always 1 token
+            num_tokens += 2  # every reply is primed with <im_start>assistant
+            return num_tokens
+        else:
+            raise NotImplementedError(f"""num_tokens_from_messages() is not presently implemented for model {model}.
+    See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens.""")
+
+    @staticmethod
+    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+    def send_prompt(prompt: str, temp: float, model: str):
+        """
+        This function sends a prompt to a specific language model with
+        specific parameters.
+        :param prompt: the prompt text
+        :param temp: the temperature model parameter value to use
+        :param model: the type of openai model to use in the API request
+        :return:
+        """
+
+        if model == 'davinci':
+            response = openai.Completion.create(
+                model="text-davinci-003",
+                prompt=prompt,
+                temperature=temp,
+                max_tokens=256,
+                top_p=1,
+                frequency_penalty=0,
+                presence_penalty=0
+            )
+
+            prompt_response = response["choices"][0]["text"].rstrip("\n")
+
+        elif model == 'chatgpt':
+            response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": prompt}]
+            )
+            prompt_response = response["choices"]["message"]["content"]
+
         return prompt_response
 
     @staticmethod
@@ -139,10 +188,15 @@ class AiParticipant:
                     row = [final_prompt] + [t] + [l] + [prompt_params_dict[f] for f in factors_b]
                     row_list_b.append(row)
         baseline_df = pd.DataFrame(row_list_b, columns=list(["prompt", "temperature", "language"] + factors_b))
+
         # for the baseline prompts these two factors will be filled later
         baseline_df['age'] = None
         baseline_df['gender'] = None
+        # add prompt type
         baseline_df['prompt_type'] = 'baseline'
+        # add number of tokens that the prompt corresponds to
+        baseline_df['n_tokens_davinci'] = baseline_df['prompt'].apply(lambda x: self.count_num_tokens(x,'davinci'))
+        baseline_df['n_tokens_chatgpt'] = baseline_df['prompt'].apply(lambda x: self.count_num_tokens(x,'chatgpt'))
 
         # # experimental prompts
         # row_list_e = []
@@ -244,9 +298,15 @@ class AiParticipant:
         collects the response and saves it in csv file
         :return:
         """
+        assert os.path.exists(os.path.join(prompts_dir, self.game, f'{self.game}_intermediate_prompts.csv')), \
+            'Prompts file does not exist'
+
+        self.prompt_df = pd.read_csv(os.path.join(prompts_dir, self.game, f'{self.game}_intermediate_prompts.csv'))
+
         # retrieve answer text
         self.prompt_df["answer_text"] = self.prompt_df.apply(lambda x: self.send_prompt(self.prompt_df["prompt"],
-                                                                                        self.prompt_df["temperature"]),
+                                                                                        self.prompt_df["temperature"],
+                                                                                        self.model_code),
                                                              axis=1)
 
         # for baseline prompts: obtain demographic info after answer
@@ -284,7 +344,17 @@ if __name__ == "__main__":
                         type=str,
                         help="""
                                 What type of action do you want to run \n 
-                                (options: test_assumptions, send_prompts_baseline, send_prompts_experimental)
+                                (options: test_assumptions, 
+                                          prepare_prompts,
+                                          send_prompts_baseline, 
+                                          send_prompts_experimental)
+                                """,
+                        required=True)
+    parser.add_argument('--model',
+                        type=str,
+                        help="""
+                                Which model do you want to use \n 
+                                (options: chatgpt (stands for gpt-3.5-turbo), davinci (stands for text-davinci-003))
                                 """,
                         required=True)
 
@@ -293,17 +363,21 @@ if __name__ == "__main__":
     general_params = load_yaml("params/params.yml")
     assert args.game in general_params["game_options"], f'Game option must be one of {general_params["game_options"]}'
     assert args.mode in general_params["mode_options"], f'Mode option must be one of {general_params["mode_options"]}'
+    assert args.model in general_params["model_options"], f'Model option must be one of {general_params["model_options"]}'
 
     # directory structure
     prompts_dir = '../prompts'
 
     # initialize AiParticipant object
-    P = AiParticipant(args.game)
+    P = AiParticipant(args.game, args.model)
 
     # if args.mode == 'test_assumptions':
     #     P.test_assumptions(general_params["game_assumption_filename"][args.game])
 
-    if args.mode == 'send_prompts_baseline':
+    if args.mode == 'prepare_prompts':
         #print('Work in progress')
         P.adjust_prompts()
+
+    if args.mode == 'send_prompts_baseline':
+        print('work in progress')
         # P.collect_answers()
