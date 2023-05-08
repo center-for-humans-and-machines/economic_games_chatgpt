@@ -40,6 +40,14 @@ class AiParticipant:
         # load environment variables
         load_dotenv()
         openai.api_key = os.environ["OPENAI_API_KEY"]
+        openai.api_base = os.environ["AZURE_ENDPOINT"]
+        openai.api_type = 'azure'
+        openai.api_version = '2023-03-15-preview'  # this may change in the future
+
+        # This will correspond to the custom name you chose for your deployment when you deployed a model.
+        assert model in ['gpt-35-turbo', 'text-davinci-003'], \
+            f'model needs to be either gpt-35-turbo or text-davinci-003, got {model} instead'
+        self.deployment_name = model
 
         # load game specific params
         self.game = game
@@ -98,10 +106,10 @@ class AiParticipant:
 
         if model == 'davinci':
             response = openai.Completion.create(
-                model="text-davinci-003",
+                engine=model,
                 prompt=prompt,
                 temperature=temp,
-                max_tokens=256,
+                max_tokens=50,
                 top_p=1,
                 frequency_penalty=0,
                 presence_penalty=0
@@ -111,7 +119,7 @@ class AiParticipant:
 
         elif model == 'chatgpt':
             response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
+                    engine=model,
                     messages=[{"role": "user", "content": prompt}]
             )
             prompt_response = response["choices"]["message"]["content"]
@@ -354,7 +362,7 @@ if __name__ == "__main__":
                         type=str,
                         help="""
                                 Which model do you want to use \n 
-                                (options: chatgpt (stands for gpt-3.5-turbo), davinci (stands for text-davinci-003))
+                                (options: chatgpt (stands for gpt-35-turbo), davinci (stands for text-davinci-003))
                                 """,
                         required=True)
 
