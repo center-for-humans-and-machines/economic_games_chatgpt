@@ -1,6 +1,5 @@
 game_options:
   - dictator_sender
-  - dictator_receiver
   - dictator_sequential
   - ultimatum_sender
   - ultimatum_receiver
@@ -10,5 +9,6 @@ mode_options:
   - send_prompts_baseline
   - send_prompts_experimental
 model_options:
-  - chatgpt
-  - davinci
+  - gpt-35-turbo
+  - text-davinci-003
+n: 1000
