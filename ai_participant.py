@@ -120,6 +120,7 @@ class AiParticipant:
             )
 
             prompt_response = response["choices"][0]["text"].rstrip("\n")
+            return prompt_response
 
         elif model == 'gpt-35-turbo':
             response = openai.ChatCompletion.create(
@@ -132,8 +133,9 @@ class AiParticipant:
                     messages=[{"role": "user", "content": prompt}]
             )
             prompt_response = response["choices"][0]["message"]["content"]
+            finish_reason = response["choices"][0]["message"]["finish_reason"]
 
-        return prompt_response
+        return prompt_response, finish_reason
 
     @staticmethod
     def classify_answer(answer: str, game: str):
@@ -228,12 +230,12 @@ class AiParticipant:
         prompt_schema = pa.DataFrameSchema({
             "prompt": pa.Column(str),
             "temperature": pa.Column(float, pa.Check.isin([0, 0.5, 1, 1.5])),
-            "age": pa.Column(str),
+            "age": pa.Column(str, ignore_na=True),
             "gender": pa.Column(str, pa.Check.isin(['female','male','non-binary'], ignore_na=True)),
             "prompt_type": pa.Column(str),
             "game_type": pa.Column(str),
             "n_tokens_davinci": pa.Column(int, pa.Check.between(0,1000)),
-            "n_tokens_chtgpt": pa.Column(int, pa.Check.between(0,1000))
+            "n_tokens_chatgpt": pa.Column(int, pa.Check.between(0,1000))
         })
 
         try:
@@ -316,10 +318,8 @@ class AiParticipant:
 
         questions = self.game_params["control_questions"]*10
         control_df = pd.DataFrame(questions, columns=['control_question'])
-        control_df['control_answer'] = control_df.apply(lambda x: self.send_prompt(control_df["prompt"],
-                                                                                   control_df["temperature"],
-                                                                                   'gpt-35-turbo'),
-                                                        axis=1)
+        control_df['control_answer'], control_df['control_answer_finish_reason'] = control_df.apply(
+            lambda x: self.send_prompt(control_df["prompt"],control_df["temperature"],'gpt-35-turbo'), axis=1)
 
         # pandera schema validation
         # define schema
@@ -331,6 +331,7 @@ class AiParticipant:
                 # outputs a boolean or boolean Series
                 pa.Check(lambda s: s.str.split("_", expand=True).shape[1] == 2)
             ]),
+            "control_answer_finish_reason": pa.Column(str, pa.Check.isin(['stop','length','content_filter','null']))
         })
 
         try:
@@ -355,23 +356,47 @@ class AiParticipant:
         assert os.path.exists(os.path.join(prompts_dir, self.game, f'{self.game}_intermediate_prompts.csv')), \
             'Prompts file does not exist'
 
-        self.prompt_df = pd.read_csv(os.path.join(prompts_dir, self.game, f'{self.game}_intermediate_prompts.csv'))
+        prompt_df = pd.read_csv(os.path.join(prompts_dir, self.game, f'{self.game}_intermediate_prompts.csv'))
 
         # retrieve answer text
-        self.prompt_df["answer_text"] = self.prompt_df.apply(lambda x: self.send_prompt(self.prompt_df["prompt"],
-                                                                                        self.prompt_df["temperature"],
-                                                                                        self.model_code),
-                                                             axis=1)
+        prompt_df["answer_text"], prompt_df["answer_text_finish_reason"] = prompt_df.apply(
+            lambda x: self.send_prompt(prompt_df["prompt"],
+                                       prompt_df["temperature"],
+                                       self.model_code),
+            axis=1)
 
         # classification of answer
-        if self.game == "ultimatum_sender":
-            self.prompt_df['answer'] = self.prompt_df.apply(lambda x: self.classify_answer(x['answer_text'],
-                                                                                           self.game), axis=1)
-            self.prompt_df['is_fair'] = np.where(self.prompt_df['money_give'] == (self.prompt_df['stake'] / 2),
-                                                 True,
-                                                 False)
+        prompt_df['answer'] = prompt_df.apply(lambda x: self.classify_answer(x['answer_text'],
+                                                                             self.game),
+                                              axis=1)
+        # self.prompt_df['is_fair'] = np.where(self.prompt_df['money_give'] == (self.prompt_df['stake'] / 2),
+        #                                     True,
+        #                                     False)
 
-        self.prompt_df.iloc[:, 1:].to_csv(os.path.join(prompts_dir, f"{self.game}_data.csv"))
+        # pandera schema validation
+        final_prompt_schema = pa.DataFrameSchema({
+            "prompt": pa.Column(str),
+            "temperature": pa.Column(float, pa.Check.isin([0, 0.5, 1, 1.5])),
+            "age": pa.Column(str, ignore_na=True),
+            "gender": pa.Column(str, pa.Check.isin(['female', 'male', 'non-binary'], ignore_na=True)),
+            "prompt_type": pa.Column(str),
+            "game_type": pa.Column(str),
+            "n_tokens_davinci": pa.Column(int, pa.Check.between(0, 1000)),
+            "n_tokens_chatgpt": pa.Column(int, pa.Check.between(0, 1000)),
+            "answer_text": pa.Column(str),
+            "answer_text_finish_reason": pa.Column(str, pa.Check.isin(['stop','content_filter','null','length'])),
+            "answer": pa.Column(int)
+        })
+
+        try:
+            final_prompt_schema.validate(prompt_df, lazy=True)
+        except pa.errors.SchemaErrors as err:
+            print("Schema errors and failure cases:")
+            print(err.failure_cases)
+            print("\nDataFrame object that failed validation:")
+            print(err.data)
+
+        prompt_df.iloc[:, 1:].to_csv(os.path.join(prompts_dir, f"{self.game}_data.csv"))
 
 
 if __name__ == "__main__":
