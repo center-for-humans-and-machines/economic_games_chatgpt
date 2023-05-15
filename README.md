@@ -1,5 +1,5 @@
 # economic_games_chatgpt
-
+![example workflow](https://github.com/SaraBonati/economic_games_chatgpt/actions/workflows/black.yml/badge.svg)
 ## Setting up the repository
 
 We use Python version 3.10.8 to create a virtual environment to be used in this project
