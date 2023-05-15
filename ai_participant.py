@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pandera as pa
 import os
+import json
 import openai
 import tiktoken
 import itertools
@@ -98,13 +99,14 @@ class AiParticipant:
 
     @staticmethod
     @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-    def send_prompt(prompt: str, temp: float, model: str):
+    def send_prompt(prompt: str, temp: float, model: str, game: str):
         """
         This function sends a prompt to a specific language model with
         specific parameters.
         :param prompt: the prompt text
         :param temp: the temperature model parameter value to use
         :param model: the type of openai model to use in the API request
+        :param game: the economic game
         :return:
         """
 
@@ -133,31 +135,37 @@ class AiParticipant:
                     messages=[{"role": "user", "content": prompt}]
             )
             prompt_response = response["choices"][0]["message"]["content"]
+            # response returned as json
+            prompt_response_dict = json.loads(prompt_response)
+            if game == 'ultimatum_receiver':
+                prompt_response_value = prompt_response_dict['decision']
+            else:
+                prompt_response_value = prompt_response_dict['amount_sent']
             finish_reason = response["choices"][0]["message"]["finish_reason"]
 
-        return prompt_response, finish_reason
+        return prompt_response_dict['reply'], prompt_response_value, finish_reason
 
-    @staticmethod
-    def classify_answer(answer: str, game: str):
-        """
-        This function attempts to classify the language model response
-        for a specific game prompt
-
-        :param answer: the answer received from the LM
-        :param game: the game type we are examining
-        :param amount: the amount of money that the question prompt used
-        :return:
-        """
-
-        if game == 'dictator_sender' or game == 'ultimatum_sender' or game == 'dictator_sequential':
-            # how much money would you give, respond with number only
-            give = [int(d) for d in re.findall(r'\d+', answer)]
-            return give[0]
-
-        if game == 'ultimatum_receiver':
-            # do you think this is fair, answer with yes or no
-            sentences = answer.split("")
-            return sentences[0]
+    # @staticmethod
+    # def classify_answer(answer: str, game: str):
+    #     """
+    #     This function attempts to classify the language model response
+    #     for a specific game prompt
+    #
+    #     :param answer: the answer received from the LM
+    #     :param game: the game type we are examining
+    #     :param amount: the amount of money that the question prompt used
+    #     :return:
+    #     """
+    #
+    #     if game == 'dictator_sender' or game == 'ultimatum_sender' or game == 'dictator_sequential':
+    #         # how much money would you give, respond with number only
+    #         give = [int(d) for d in re.findall(r'\d+', answer)]
+    #         return give[0]
+    #
+    #     if game == 'ultimatum_receiver':
+    #         # do you think this is fair, answer with yes or no
+    #         sentences = answer.split("")
+    #         return sentences[0]
 
     def adjust_prompts(self):
         """
@@ -230,8 +238,8 @@ class AiParticipant:
         prompt_schema = pa.DataFrameSchema({
             "prompt": pa.Column(str),
             "temperature": pa.Column(float, pa.Check.isin([0, 0.5, 1, 1.5])),
-            "age": pa.Column(str, ignore_na=True),
-            "gender": pa.Column(str, pa.Check.isin(['female','male','non-binary'], ignore_na=True)),
+            "age": pa.Column(str),
+            "gender": pa.Column(str, pa.Check.isin(['female','male','non-binary'])),
             "prompt_type": pa.Column(str),
             "game_type": pa.Column(str),
             "n_tokens_davinci": pa.Column(int, pa.Check.between(0,1000)),
@@ -259,57 +267,6 @@ class AiParticipant:
         baseline_df.to_csv(os.path.join(prompts_dir, self.game, f'{self.game}_baseline_prompts.csv'))
         experimental_df.to_csv(os.path.join(prompts_dir, self.game, f'{self.game}_experimental_prompts.csv'))
 
-    # @staticmethod
-    # def build_followup_baseline_prompt(prompt, answer, language, game_params):
-    #     return prompt + '\n' + answer + '\n' + game_params[f'prompt_baseline_followup_{language}']
-    #
-    # def obtain_baseline_info(self):
-    #     """
-    #     This method sends an additional prompt to the language model for baseline condition.
-    #     The prompt is made of the previous model answer + a follow-up question to obtain
-    #     demographic info.
-    #     :return:
-    #     """
-    #
-    #     # create new columns for baseline prompts only
-    #     self.prompt_df['baseline_followup'] = None
-    #     self.prompt_df['baseline_followup'] = self.prompt_df[self.prompt_df['prompt_type'] == 'baseline'].apply(
-    #         lambda x:
-    #         self.build_followup_baseline_prompt(self.prompt_df["prompt"],
-    #                                             self.prompt_df["answer_text"],
-    #                                             self.prompt_df["language"],
-    #                                             self.game_params),
-    #         axis=1)
-    #
-    #     # obtain answer (language is already set, we specify the temperature parameter)
-    #     self.prompt_df['baseline_followup_answer'] = None
-    #     self.prompt_df['baseline_followup_answer'] = self.prompt_df[self.prompt_df['prompt_type'] == 'baseline'].apply(
-    #         lambda x: self.send_prompt(self.prompt_df["baseline_followup"],
-    #                                    self.prompt_df["temperature"]),
-    #         axis=1)
-    #
-    #     # convert column to string
-    #     self.prompt_df['baseline_followup_answer'] = self.prompt_df['baseline_followup_answer'].astype(str)
-    #
-    #     # separate gender and age phrases into two temporary columns
-    #     self.prompt_df[['temp_gender', 'temp_age']] = self.prompt_df[self.prompt_df['prompt_type'] == 'baseline'][
-    #         'baseline_followup_answer'].str.split(pat='.',
-    #                                               expand=True)
-    #
-    #     # extract gender
-    #     self.prompt_df.loc[self.prompt_df['prompt_type'] == 'baseline', 'gender'] = \
-    #         self.prompt_df[self.prompt_df['prompt_type'] == 'baseline']['temp_gender'].str.partition('is ')[
-    #             2].str.extract(
-    #             r"([^0-9]+)", expand=False)
-    #     # extract age
-    #     self.prompt_df.loc[self.prompt_df['prompt_type'] == 'baseline', 'age'] = \
-    #         self.prompt_df[self.prompt_df['prompt_type'] == 'baseline']['temp_age'].str.extract(
-    #             r"(\d{1,3})", expand=False).astype(int)
-    #
-    #     # remove temp columns
-    #     self.prompt_df.drop(['temp_age', 'temp_gender'], axis=1, inplace=True)
-
-
     def collect_control_answers(self):
         """
         This method collects answers to control questions
@@ -318,8 +275,8 @@ class AiParticipant:
 
         questions = self.game_params["control_questions"]*10
         control_df = pd.DataFrame(questions, columns=['control_question'])
-        control_df['control_answer'], control_df['control_answer_finish_reason'] = control_df.apply(
-            lambda x: self.send_prompt(control_df["prompt"],control_df["temperature"],'gpt-35-turbo'), axis=1)
+        control_df['control_answer'], control_df['finish_reason'] = control_df.apply(
+            lambda x: self.send_prompt(control_df["prompt"], control_df["temperature"], 'gpt-35-turbo'), axis=1)
 
         # pandera schema validation
         # define schema
@@ -331,7 +288,7 @@ class AiParticipant:
                 # outputs a boolean or boolean Series
                 pa.Check(lambda s: s.str.split("_", expand=True).shape[1] == 2)
             ]),
-            "control_answer_finish_reason": pa.Column(str, pa.Check.isin(['stop','length','content_filter','null']))
+            "finish_reason": pa.Column(str, pa.Check.isin(['stop','length','content_filter','null']))
         })
 
         try:
@@ -359,33 +316,26 @@ class AiParticipant:
         prompt_df = pd.read_csv(os.path.join(prompts_dir, self.game, f'{self.game}_intermediate_prompts.csv'))
 
         # retrieve answer text
-        prompt_df["answer_text"], prompt_df["answer_text_finish_reason"] = prompt_df.apply(
+        prompt_df["answer_text"], prompt_df["answer"], prompt_df["finish_reason"] = prompt_df.apply(
             lambda x: self.send_prompt(prompt_df["prompt"],
                                        prompt_df["temperature"],
-                                       self.model_code),
+                                       self.model_code,
+                                       self.game),
             axis=1)
-
-        # classification of answer
-        prompt_df['answer'] = prompt_df.apply(lambda x: self.classify_answer(x['answer_text'],
-                                                                             self.game),
-                                              axis=1)
-        # self.prompt_df['is_fair'] = np.where(self.prompt_df['money_give'] == (self.prompt_df['stake'] / 2),
-        #                                     True,
-        #                                     False)
 
         # pandera schema validation
         final_prompt_schema = pa.DataFrameSchema({
             "prompt": pa.Column(str),
             "temperature": pa.Column(float, pa.Check.isin([0, 0.5, 1, 1.5])),
-            "age": pa.Column(str, ignore_na=True),
-            "gender": pa.Column(str, pa.Check.isin(['female', 'male', 'non-binary'], ignore_na=True)),
+            "age": pa.Column(str),
+            "gender": pa.Column(str, pa.Check.isin(['female', 'male', 'non-binary'])),
             "prompt_type": pa.Column(str),
             "game_type": pa.Column(str),
             "n_tokens_davinci": pa.Column(int, pa.Check.between(0, 1000)),
             "n_tokens_chatgpt": pa.Column(int, pa.Check.between(0, 1000)),
             "answer_text": pa.Column(str),
-            "answer_text_finish_reason": pa.Column(str, pa.Check.isin(['stop','content_filter','null','length'])),
-            "answer": pa.Column(int)
+            "answer": pa.Column(int, pa.Check.between(0,10)),
+            "finish_reason": pa.Column(str, pa.Check.isin(['stop','content_filter','null','length'])),
         })
 
         try:
@@ -396,7 +346,7 @@ class AiParticipant:
             print("\nDataFrame object that failed validation:")
             print(err.data)
 
-        prompt_df.iloc[:, 1:].to_csv(os.path.join(prompts_dir, f"{self.game}_data.csv"))
+        prompt_df.to_csv(os.path.join(prompts_dir, f"{self.game}_data.csv"))
 
 
 if __name__ == "__main__":
