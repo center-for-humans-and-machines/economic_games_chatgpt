@@ -40,10 +40,10 @@ class AiParticipant:
 
         # load environment variables
         load_dotenv()
-        openai.api_key = os.environ["OPENAI_API_KEY"]
-        openai.api_base = os.environ["AZURE_ENDPOINT"]
         openai.api_type = "azure"
-        openai.api_version = "2023-03-15-preview"  # this may change in the future
+        openai.api_base = os.getenv("AZURE_ENDPOINT")
+        openai.api_version = "2023-03-15-preview"
+        openai.api_key = os.getenv("OPENAI_API_KEY")
 
         # This will correspond to the custom name you chose for your deployment when you deployed a model.
         assert model in [
@@ -101,7 +101,7 @@ class AiParticipant:
             )
 
     @staticmethod
-    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+    # @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
     def send_prompt(prompt: str, temp: float, model: str, game: str):
         """
         This function sends a prompt to a specific language model with
@@ -130,21 +130,28 @@ class AiParticipant:
         elif model == "gpt-35-turbo":
             response = openai.ChatCompletion.create(
                 engine=model,
+                messages=[{"role": "user", "content": prompt}],
                 temperature=temp,
                 max_tokens=50,
                 top_p=1,
                 frequency_penalty=0,
                 presence_penalty=0,
-                messages=[{"role": "user", "content": prompt}],
             )
             prompt_response = response["choices"][0]["message"]["content"]
+            print(prompt_response)
+            print(type(prompt_response))
             # response returned as json
             prompt_response_dict = json.loads(prompt_response)
+            print(type(prompt_response_dict))
             if game == "ultimatum_receiver":
                 prompt_response_value = prompt_response_dict["decision"]
             else:
                 prompt_response_value = prompt_response_dict["amount_sent"]
-            finish_reason = response["choices"][0]["message"]["finish_reason"]
+            finish_reason = response["choices"][0]["finish_reason"]
+
+            print(type(prompt_response_dict["reply"]))
+            print(type(prompt_response_value))
+            print(type(finish_reason))
 
         return prompt_response_dict["reply"], prompt_response_value, finish_reason
 
@@ -182,7 +189,6 @@ class AiParticipant:
 
         # baseline prompts
         if self.game.endswith("_sender"):
-
             row_list_b = []
             for t in self.game_params["temperature"]:
                 row = [self.game_params[f"prompt_baseline"]] + [t]
@@ -192,7 +198,6 @@ class AiParticipant:
             )
 
         else:
-
             row_list_b = []
             factors_b = self.game_params["factors_baseline_names"]
             factors_list_b = [self.game_params[f] for f in factors_b]
@@ -356,38 +361,36 @@ class AiParticipant:
             index=False,
         )
 
-    def collect_answers(self):
+    def collect_answers(self, prompt_type: str):
         """
         This function sends a request to an openai language model,
         collects the response and saves it in csv file
+
+        :param prompt_type: baseline or experimental
         :return:
         """
         assert os.path.exists(
             os.path.join(
-                prompts_dir, self.game, f"{self.game}_intermediate_prompts.csv"
+                prompts_dir, self.game, f"{self.game}_{prompt_type}_prompts.csv"
             )
         ), "Prompts file does not exist"
 
         prompt_df = pd.read_csv(
             os.path.join(
-                prompts_dir, self.game, f"{self.game}_intermediate_prompts.csv"
+                prompts_dir, self.game, f"{self.game}_{prompt_type}_prompts.csv"
             )
         )
 
         # retrieve answer text
-        (
-            prompt_df["answer_text"],
-            prompt_df["answer"],
-            prompt_df["finish_reason"],
-        ) = prompt_df.apply(
-            lambda x: self.send_prompt(
-                prompt_df["prompt"],
-                prompt_df["temperature"],
+        prompt_df[["answer_text", "answer", "finish_reason"]] = prompt_df.apply(
+            lambda row: self.send_prompt(
+                row["prompt"],
+                row["temperature"],
                 self.model_code,
                 self.game,
             ),
             axis=1,
-        )
+        ).apply(pd.Series)
 
         # pandera schema validation
         final_prompt_schema = pa.DataFrameSchema(
@@ -418,11 +421,12 @@ class AiParticipant:
             print("\nDataFrame object that failed validation:")
             print(err.data)
 
-        prompt_df.to_csv(os.path.join(prompts_dir, f"{self.game}_data.csv"))
+        prompt_df.to_csv(
+            os.path.join(prompts_dir, self.game, f"{self.game}_data.csv"), index=False
+        )
 
 
 if __name__ == "__main__":
-
     # parse arguments
     parser = argparse.ArgumentParser(
         description="""
@@ -488,5 +492,7 @@ if __name__ == "__main__":
         P.adjust_prompts()
 
     if args.mode == "send_prompts_baseline":
-        print("work in progress")
-        # P.collect_answers()
+        P.collect_answers("baseline")
+
+    if args.mode == "send_prompts_experimental":
+        P.collect_answers("experimental")
