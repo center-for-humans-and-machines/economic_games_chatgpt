@@ -102,7 +102,7 @@ class AiParticipant:
 
     @staticmethod
     # @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-    def send_prompt(prompt: str, temp: float, model: str, game: str):
+    def send_prompt(prompt: str, temp: float, model: str, game: str, mode: str):
         """
         This function sends a prompt to a specific language model with
         specific parameters.
@@ -110,6 +110,7 @@ class AiParticipant:
         :param temp: the temperature model parameter value to use
         :param model: the type of openai model to use in the API request
         :param game: the economic game
+        :param mode: either control questions or running the experiment
         :return:
         """
 
@@ -138,44 +139,23 @@ class AiParticipant:
                 presence_penalty=0,
             )
             prompt_response = response["choices"][0]["message"]["content"]
-            print(prompt_response)
-            print(type(prompt_response))
+            finish_reason = response["choices"][0]["finish_reason"]
             # response returned as json
             prompt_response_dict = json.loads(prompt_response)
-            print(type(prompt_response_dict))
-            if game == "ultimatum_receiver":
-                prompt_response_value = prompt_response_dict["decision"]
+
+            if mode == "test_assumptions":
+                return prompt_response_dict
             else:
-                prompt_response_value = prompt_response_dict["amount_sent"]
-            finish_reason = response["choices"][0]["finish_reason"]
+                if game == "ultimatum_receiver":
+                    prompt_response_value = prompt_response_dict["decision"]
+                else:
+                    prompt_response_value = prompt_response_dict["amount_sent"]
 
-            print(type(prompt_response_dict["reply"]))
-            print(type(prompt_response_value))
-            print(type(finish_reason))
-
-        return prompt_response_dict["reply"], prompt_response_value, finish_reason
-
-    # @staticmethod
-    # def classify_answer(answer: str, game: str):
-    #     """
-    #     This function attempts to classify the language model response
-    #     for a specific game prompt
-    #
-    #     :param answer: the answer received from the LM
-    #     :param game: the game type we are examining
-    #     :param amount: the amount of money that the question prompt used
-    #     :return:
-    #     """
-    #
-    #     if game == 'dictator_sender' or game == 'ultimatum_sender' or game == 'dictator_sequential':
-    #         # how much money would you give, respond with number only
-    #         give = [int(d) for d in re.findall(r'\d+', answer)]
-    #         return give[0]
-    #
-    #     if game == 'ultimatum_receiver':
-    #         # do you think this is fair, answer with yes or no
-    #         sentences = answer.split("")
-    #         return sentences[0]
+                return (
+                    prompt_response_dict["reply"],
+                    prompt_response_value,
+                    finish_reason,
+                )
 
     def adjust_prompts(self):
         """
@@ -317,14 +297,16 @@ class AiParticipant:
         :return:
         """
 
-        questions = self.game_params["control_questions"] * 10
+        questions = [self.game_params["control_questions"]] * 2
         control_df = pd.DataFrame(questions, columns=["control_question"])
-        control_df["control_answer"], control_df["finish_reason"] = control_df.apply(
-            lambda x: self.send_prompt(
-                control_df["prompt"], control_df["temperature"], "gpt-35-turbo"
-            ),
-            axis=1,
+        # Apply the function to the column and create a DataFrame from the resulting dictionaries
+        new_columns_df = pd.DataFrame.from_records(
+            control_df["control_question"].apply(
+                self.send_prompt,
+                args=(1, "gpt-35-turbo", self.game, "test_assumptions"),
+            )
         )
+        control_df[new_columns_df.columns] = new_columns_df
 
         # pandera schema validation
         # define schema
@@ -384,10 +366,7 @@ class AiParticipant:
         # retrieve answer text
         prompt_df[["answer_text", "answer", "finish_reason"]] = prompt_df.apply(
             lambda row: self.send_prompt(
-                row["prompt"],
-                row["temperature"],
-                self.model_code,
-                self.game,
+                row["prompt"], row["temperature"], self.model_code, self.game, ""
             ),
             axis=1,
         ).apply(pd.Series)
@@ -485,8 +464,8 @@ if __name__ == "__main__":
     # initialize AiParticipant object
     P = AiParticipant(args.game, args.model, general_params["n"])
 
-    # if args.mode == 'test_assumptions':
-    #     P.test_assumptions(general_params["game_assumption_filename"][args.game])
+    if args.mode == "test_assumptions":
+        P.collect_control_answers()
 
     if args.mode == "prepare_prompts":
         P.adjust_prompts()
