@@ -1,5 +1,6 @@
 game_options:
   - dictator_sender
+  - dictator_binary
   - dictator_sequential
   - ultimatum_sender
   - ultimatum_receiver
