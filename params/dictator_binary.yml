@@ -8,6 +8,8 @@ control_questions: 'Scenario: I (person A) am playing a game and am paired with 
 - Is it specified in the rules of this setting that person A has to be fair in dividing the 10 euros? Please answer with "yes" or "no" only.
 Format your response in JSON format, with the keys "question1", "question2", etc. all containing strings. Make your response as short as possible.'
 temperature: [0.5,1,1.5]
-factors_experimental_names: [age, gender]
+factors_baseline_names: [fairness]
+factors_experimental_names: [fairness, age, gender]
 age: ['18-30', '31-50', '51-70']
 gender: [female,male,non-binary]
+fairness: [1,2,3,4,5,10]
