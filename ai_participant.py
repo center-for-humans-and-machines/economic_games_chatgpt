@@ -16,6 +16,8 @@ from dotenv import load_dotenv
 import argparse
 import yaml
 import re
+from tqdm import tqdm
+import time
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -60,6 +62,8 @@ class AiParticipant:
         self.model_code = model
 
         # define number of times a prompt needs to be sent for each combination
+        self.n_control = 10
+        # define number of times a prompt needs to be sent for each combination
         self.n = n
 
     @staticmethod
@@ -101,7 +105,7 @@ class AiParticipant:
             )
 
     @staticmethod
-    # @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
     def send_prompt(prompt: str, temp: float, model: str, game: str, mode: str):
         """
         This function sends a prompt to a specific language model with
@@ -113,6 +117,9 @@ class AiParticipant:
         :param mode: either control questions or running the experiment
         :return:
         """
+
+        # add this to avoid rate limit errors
+        time.sleep(3)
 
         if model == "text-davinci-003":
             response = openai.Completion.create(
@@ -171,8 +178,9 @@ class AiParticipant:
         if self.game.endswith("_sender"):
             row_list_b = []
             for t in self.game_params["temperature"]:
-                row = [self.game_params[f"prompt_baseline"]] + [t]
-                row_list_b.append(row)
+                for i in range(self.n):
+                    row = [self.game_params[f"prompt_baseline"]] + [t]
+                    row_list_b.append(row)
             baseline_df = pd.DataFrame(
                 row_list_b, columns=list(["prompt", "temperature"])
             )
@@ -186,36 +194,37 @@ class AiParticipant:
 
             for t in self.game_params["temperature"]:
                 for comb in all_comb_b:
-                    prompt_params_dict = {
-                        factors_b[f]: comb[f] for f in range(len(factors_b))
-                    }
-                    final_prompt = self.game_params[f"prompt_baseline"].format(
-                        **prompt_params_dict
-                    )
-                    row = (
-                        [final_prompt]
-                        + [t]
-                        + [prompt_params_dict[f] for f in factors_b]
-                    )
-                    row_list_b.append(row)
+                    for i in range(self.n):
+                        prompt_params_dict = {
+                            factors_b[f]: comb[f] for f in range(len(factors_b))
+                        }
+                        final_prompt = self.game_params[f"prompt_baseline"].format(
+                            **prompt_params_dict
+                        )
+                        row = (
+                            [final_prompt]
+                            + [t]
+                            + [prompt_params_dict[f] for f in factors_b]
+                        )
+                        row_list_b.append(row)
             baseline_df = pd.DataFrame(
                 row_list_b, columns=list(["prompt", "temperature"] + factors_b)
             )
 
         # for the baseline prompts these two factors will be filled later
-        baseline_df["age"] = None
-        baseline_df["gender"] = None
+        baseline_df["age"] = "not_prompted"
+        baseline_df["gender"] = "not_prompted"
         # add prompt type
         baseline_df["prompt_type"] = "baseline"
         baseline_df["game_type"] = self.game
 
         # add number of tokens that the prompt corresponds to
-        baseline_df["n_tokens_davinci"] = baseline_df["prompt"].apply(
-            lambda x: self.count_num_tokens(x, "davinci")
-        )
-        baseline_df["n_tokens_chatgpt"] = baseline_df["prompt"].apply(
-            lambda x: self.count_num_tokens(x, "chatgpt")
-        )
+        # baseline_df["n_tokens_davinci"] = baseline_df["prompt"].apply(
+        #     lambda x: self.count_num_tokens(x, "davinci")
+        # )
+        # baseline_df["n_tokens_chatgpt"] = baseline_df["prompt"].apply(
+        #     lambda x: self.count_num_tokens(x, "chatgpt")
+        # )
 
         # experimental prompts
         row_list_e = []
@@ -226,41 +235,49 @@ class AiParticipant:
 
         for t in self.game_params["temperature"]:
             for comb in all_comb_e:
-                prompt_params_dict = {
-                    factors_e[f]: comb[f] for f in range(len(factors_e))
-                }
-                final_prompt = self.game_params[f"prompt_complete"].format(
-                    **prompt_params_dict
-                )
-                row = [final_prompt] + [t] + [prompt_params_dict[f] for f in factors_e]
-                row_list_e.append(row)
+                for i in range(self.n):
+                    prompt_params_dict = {
+                        factors_e[f]: comb[f] for f in range(len(factors_e))
+                    }
+                    final_prompt = self.game_params[f"prompt_complete"].format(
+                        **prompt_params_dict
+                    )
+                    row = (
+                        [final_prompt]
+                        + [t]
+                        + [prompt_params_dict[f] for f in factors_e]
+                    )
+                    row_list_e.append(row)
 
         experimental_df = pd.DataFrame(
             row_list_e, columns=list(["prompt", "temperature"] + factors_e)
         )
         experimental_df["prompt_type"] = "experimental"
         experimental_df["game_type"] = self.game
+
         # add number of tokens that the prompt corresponds to
-        experimental_df["n_tokens_davinci"] = experimental_df["prompt"].apply(
-            lambda x: self.count_num_tokens(x, "davinci")
-        )
-        experimental_df["n_tokens_chatgpt"] = experimental_df["prompt"].apply(
-            lambda x: self.count_num_tokens(x, "chatgpt")
-        )
+        # experimental_df["n_tokens_davinci"] = experimental_df["prompt"].apply(
+        #     lambda x: self.count_num_tokens(x, "davinci")
+        # )
+        # experimental_df["n_tokens_chatgpt"] = experimental_df["prompt"].apply(
+        #     lambda x: self.count_num_tokens(x, "chatgpt")
+        # )
 
         # pandera schema validation
         prompt_schema = pa.DataFrameSchema(
             {
                 "prompt": pa.Column(str),
                 "temperature": pa.Column(float, pa.Check.isin([0, 0.5, 1, 1.5])),
-                "age": pa.Column(str),
+                "age": pa.Column(
+                    str, pa.Check.isin(["not_prompted", "18-30", "31-50", "51-70"])
+                ),
                 "gender": pa.Column(
-                    str, pa.Check.isin(["female", "male", "non-binary"])
+                    str, pa.Check.isin(["not_prompted", "female", "male", "non-binary"])
                 ),
                 "prompt_type": pa.Column(str),
                 "game_type": pa.Column(str),
-                "n_tokens_davinci": pa.Column(int, pa.Check.between(0, 1000)),
-                "n_tokens_chatgpt": pa.Column(int, pa.Check.between(0, 1000)),
+                # "n_tokens_davinci": pa.Column(int, pa.Check.between(0, 1000)),
+                # "n_tokens_chatgpt": pa.Column(int, pa.Check.between(0, 1000)),
             }
         )
 
@@ -297,36 +314,67 @@ class AiParticipant:
         :return:
         """
 
-        questions = [self.game_params["control_questions"]] * 2
+        tqdm.pandas(desc="Control questions progress")
+
+        questions = [self.game_params["control_questions"]] * 2  # self.n_control
         control_df = pd.DataFrame(questions, columns=["control_question"])
+        print("control dataframe created!")
         # Apply the function to the column and create a DataFrame from the resulting dictionaries
         new_columns_df = pd.DataFrame.from_records(
-            control_df["control_question"].apply(
+            control_df["control_question"].progress_apply(
                 self.send_prompt,
                 args=(1, "gpt-35-turbo", self.game, "test_assumptions"),
             )
         )
         control_df[new_columns_df.columns] = new_columns_df
+        print("answers collected!")
 
         # pandera schema validation
         # define schema
-        control_schema = pa.DataFrameSchema(
-            {
-                "control_question": pa.Column(str),
-                "control_answer": pa.Column(
-                    str,
-                    checks=[
-                        pa.Check.str_startswith("value_"),
-                        # define custom checks as functions that take a series as input and
-                        # outputs a boolean or boolean Series
-                        pa.Check(lambda s: s.str.split("_", expand=True).shape[1] == 2),
-                    ],
-                ),
-                "finish_reason": pa.Column(
-                    str, pa.Check.isin(["stop", "length", "content_filter", "null"])
-                ),
-            }
-        )
+        if self.game == "dictator_sender" or self.game == "dictator_sequential":
+            control_schema = pa.DataFrameSchema(
+                {
+                    "control_question": pa.Column(str),
+                    "question1": pa.Column(int, coerce=True),
+                    "question2": pa.Column(int, coerce=True),
+                    "question3": pa.Column(int, coerce=True),
+                    "question4": pa.Column(str),
+                    "question5": pa.Column(str),
+                }
+            )
+
+        elif self.game == "ultimatum_sender":
+            control_schema = pa.DataFrameSchema(
+                {
+                    "control_question": pa.Column(str),
+                    "question1": pa.Column(int, coerce=True),
+                    "question2": pa.Column(int, coerce=True),
+                    "question3": pa.Column(int, coerce=True),
+                    "question4": pa.Column(str),
+                    "question5": pa.Column(str),
+                    "question6": pa.Column(int, coerce=True),
+                    "question7": pa.Column(int, coerce=True),
+                    "question8": pa.Column(int, coerce=True),
+                    "question9": pa.Column(int, coerce=True),
+                }
+            )
+
+        elif self.game == "ultimatum_receiver":
+            control_schema = pa.DataFrameSchema(
+                {
+                    "control_question": pa.Column(str),
+                    "question1": pa.Column(int, coerce=True),
+                    "question2": pa.Column(int, coerce=True),
+                    "question3": pa.Column(int, coerce=True),
+                    "question4": pa.Column(int, coerce=True),
+                    "question5": pa.Column(str),
+                    "question6": pa.Column(str),
+                    "question7": pa.Column(int, coerce=True),
+                    "question8": pa.Column(int, coerce=True),
+                    "question9": pa.Column(int, coerce=True),
+                    "question10": pa.Column(int, coerce=True),
+                }
+            )
 
         try:
             control_schema.validate(control_df, lazy=True)
@@ -363,29 +411,37 @@ class AiParticipant:
             )
         )
 
+        tqdm.pandas(desc="Experiment progress")
+
         # retrieve answer text
-        prompt_df[["answer_text", "answer", "finish_reason"]] = prompt_df.apply(
+        prompt_df[
+            ["answer_text", "answer", "finish_reason"]
+        ] = prompt_df.progress_apply(
             lambda row: self.send_prompt(
                 row["prompt"], row["temperature"], self.model_code, self.game, ""
             ),
             axis=1,
-        ).apply(pd.Series)
+        ).apply(
+            pd.Series
+        )
 
         # pandera schema validation
         final_prompt_schema = pa.DataFrameSchema(
             {
                 "prompt": pa.Column(str),
                 "temperature": pa.Column(float, pa.Check.isin([0, 0.5, 1, 1.5])),
-                "age": pa.Column(str),
+                "age": pa.Column(
+                    str, pa.Check.isin(["not_prompted", "18-30", "31-50", "51-70"])
+                ),
                 "gender": pa.Column(
-                    str, pa.Check.isin(["female", "male", "non-binary"])
+                    str, pa.Check.isin(["not_prompted", "female", "male", "non-binary"])
                 ),
                 "prompt_type": pa.Column(str),
                 "game_type": pa.Column(str),
-                "n_tokens_davinci": pa.Column(int, pa.Check.between(0, 1000)),
-                "n_tokens_chatgpt": pa.Column(int, pa.Check.between(0, 1000)),
+                # "n_tokens_davinci": pa.Column(int, pa.Check.between(0, 1000)),
+                # "n_tokens_chatgpt": pa.Column(int, pa.Check.between(0, 1000)),
                 "answer_text": pa.Column(str),
-                "answer": pa.Column(int, pa.Check.between(0, 10)),
+                "answer": pa.Column(int, pa.Check.between(0, 10), coerce=True),
                 "finish_reason": pa.Column(
                     str, pa.Check.isin(["stop", "content_filter", "null", "length"])
                 ),
@@ -419,7 +475,7 @@ if __name__ == "__main__":
         type=str,
         help="""
                                 Which economic game do you want to run \n 
-                                (options: dictator_sender, dictator_sequential, ultimatum_sender, ultimatum_receiver)
+                                (options: dictator_sender, dictator_sequential, dictator_binary, ultimatum_sender, ultimatum_receiver)
                                 """,
         required=True,
     )
