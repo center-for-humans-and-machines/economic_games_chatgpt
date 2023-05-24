@@ -119,7 +119,7 @@ class AiParticipant:
         """
 
         # add this to avoid rate limit errors
-        time.sleep(3)
+        #time.sleep(3)
 
         if model == "text-davinci-003":
             response = openai.Completion.create(
@@ -411,12 +411,12 @@ class AiParticipant:
             )
         )
 
-        tqdm.pandas(desc="Experiment progress")
+        #tqdm.pandas(desc="Experiment progress")
 
         # retrieve answer text
         prompt_df[
             ["answer_text", "answer", "finish_reason"]
-        ] = prompt_df.progress_apply(
+        ] = prompt_df.apply(
             lambda row: self.send_prompt(
                 row["prompt"], row["temperature"], self.model_code, self.game, ""
             ),
