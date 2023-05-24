@@ -1,0 +1,5 @@
+pandas
+openai
+tenacity
+pandera
+tqdm
