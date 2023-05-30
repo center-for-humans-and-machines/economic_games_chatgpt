@@ -1,5 +1,8 @@
+tiktoken
 pandas
 openai
 tenacity
 pandera
 tqdm
+aiohttp
+python-dotenv
