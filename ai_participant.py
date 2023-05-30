@@ -21,6 +21,8 @@ import time
 from tenacity import (
     retry,
     stop_after_attempt,
+    wait_fixed,
+    wait_random,
     wait_random_exponential,
 )
 
@@ -105,7 +107,7 @@ class AiParticipant:
             )
 
     @staticmethod
-    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+    @retry(wait=wait_fixed(3) + wait_random(0, 2), stop=stop_after_attempt(4))
     def send_prompt(prompt: str, temp: float, model: str, game: str, mode: str):
         """
         This function sends a prompt to a specific language model with
@@ -202,9 +204,9 @@ class AiParticipant:
                             **prompt_params_dict
                         )
                         row = (
-                            [final_prompt]
-                            + [t]
-                            + [prompt_params_dict[f] for f in factors_b]
+                                [final_prompt]
+                                + [t]
+                                + [prompt_params_dict[f] for f in factors_b]
                         )
                         row_list_b.append(row)
             baseline_df = pd.DataFrame(
@@ -243,9 +245,9 @@ class AiParticipant:
                         **prompt_params_dict
                     )
                     row = (
-                        [final_prompt]
-                        + [t]
-                        + [prompt_params_dict[f] for f in factors_e]
+                            [final_prompt]
+                            + [t]
+                            + [prompt_params_dict[f] for f in factors_e]
                     )
                     row_list_e.append(row)
 
@@ -307,6 +309,46 @@ class AiParticipant:
                 prompts_dir, self.game, f"{self.game}_experimental_prompts.csv"
             )
         )
+
+    def convert_data_to_jsonl(self, prompt_type: str):
+        """
+        This function converts the csv files with prompts and parameters into a JSONL file
+        for async API calls. Each line in the JSONL corresponds to metadata to be sent with the API request
+
+        :param prompt_type: the type of prompts (baseline or experimental)
+        :return:
+        """
+        assert os.path.exists(
+            os.path.join(
+                prompts_dir, self.game, f"{self.game}_{prompt_type}_prompts.csv"
+            )
+        ), "Prompts file does not exist"
+
+        prompt_df = pd.read_csv(
+            os.path.join(
+                prompts_dir, self.game, f"{self.game}_{prompt_type}_prompts.csv"
+            )
+        )
+
+        JSON_file = []
+        JSON_filename = f'{self.game}_{prompt_type}_prompts.jsonl'
+
+        for index, row in prompt_df.iterrows():
+            JSON_file.append(
+                {
+                    "messages": [{"role": "user", "content": row['prompt']}],
+                    "temperature": row['temperature'],
+                    "max_tokens": 50,
+                    "top_p": 1,
+                    "frequency_penalty": 0,
+                    "presence_penalty": 0,
+                }
+            )
+
+        with open(os.path.join(prompts_dir, self.game, JSON_filename), 'w') as outfile:
+            for entry in JSON_file:
+                json.dump(entry, outfile)
+                outfile.write('\n')
 
     def collect_control_answers(self):
         """
@@ -412,18 +454,30 @@ class AiParticipant:
         )
 
         # tqdm.pandas(desc="Experiment progress")
+        #
+        # # retrieve answer text
+        # prompt_df[
+        #     ["answer_text", "answer", "finish_reason"]
+        # ] = prompt_df.progress_apply(
+        #     lambda row: self.send_prompt(
+        #         row["prompt"], row["temperature"], self.model_code, self.game, ""
+        #     ),
+        #     axis=1,
+        # ).apply(
+        #     pd.Series
+        # )
 
-        # retrieve answer text
-        prompt_df[
-            ["answer_text", "answer", "finish_reason"]
-        ] = prompt_df.apply(
-            lambda row: self.send_prompt(
-                row["prompt"], row["temperature"], self.model_code, self.game, ""
-            ),
-            axis=1,
-        ).apply(
-            pd.Series
-        )
+        for i in tqdm(range(len(prompt_df))):
+            if i % 5 == 0:
+                time.sleep(10)
+            answer_text, answer, finish_reason = self.send_prompt(prompt_df.loc[i, "prompt"],
+                                                                  prompt_df.loc[i, "temperature"],
+                                                                  self.model_code,
+                                                                  self.game,
+                                                                  "")
+            prompt_df.loc[i, 'answer_text'] = answer_text
+            prompt_df.loc[i, 'answer'] = answer
+            prompt_df.loc[i, 'finish_reason'] = finish_reason
 
         # pandera schema validation
         final_prompt_schema = pa.DataFrameSchema(
@@ -486,6 +540,7 @@ if __name__ == "__main__":
                                 What type of action do you want to run \n 
                                 (options: test_assumptions, 
                                           prepare_prompts,
+                                          convert_prompts_to_json,
                                           send_prompts_baseline, 
                                           send_prompts_experimental)
                                 """,
@@ -505,13 +560,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     general_params = load_yaml("params/params.yml")
     assert (
-        args.game in general_params["game_options"]
+            args.game in general_params["game_options"]
     ), f'Game option must be one of {general_params["game_options"]}'
     assert (
-        args.mode in general_params["mode_options"]
+            args.mode in general_params["mode_options"]
     ), f'Mode option must be one of {general_params["mode_options"]}'
     assert (
-        args.model in general_params["model_options"]
+            args.model in general_params["model_options"]
     ), f'Model option must be one of {general_params["model_options"]}'
 
     # directory structure
@@ -525,6 +580,9 @@ if __name__ == "__main__":
 
     if args.mode == "prepare_prompts":
         P.adjust_prompts()
+
+    if args.mode == "convert_prompts_to_json":
+        P.convert_data_to_jsonl("baseline")
 
     if args.mode == "send_prompts_baseline":
         P.collect_answers("baseline")

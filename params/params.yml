@@ -7,6 +7,7 @@ game_options:
 mode_options:
   - test_assumptions
   - prepare_prompts
+  - convert_prompts_to_json
   - send_prompts_baseline
   - send_prompts_experimental
 model_options:
