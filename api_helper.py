@@ -407,7 +407,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # directory structure
-    prompts_dir = "../prompts"
+    prompts_dir = "./prompts_jsonl"
     requests_filepath = os.path.join(prompts_dir, args.game, f"{args.game}_{args.exptype}_prompts.jsonl")
     save_filepath = os.path.join(prompts_dir, args.game, f"{args.game}_{args.exptype}_results.jsonl")
 
