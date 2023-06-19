@@ -200,6 +200,10 @@ class AiParticipant:
                         prompt_params_dict = {
                             factors_b[f]: comb[f] for f in range(len(factors_b))
                         }
+
+                        if self.game == 'dictator_binary':
+                            prompt_params_dict['fairness2'] = 10 - prompt_params_dict['fairness']
+
                         final_prompt = self.game_params[f"prompt_baseline"].format(
                             **prompt_params_dict
                         )
@@ -241,6 +245,10 @@ class AiParticipant:
                     prompt_params_dict = {
                         factors_e[f]: comb[f] for f in range(len(factors_e))
                     }
+
+                    if self.game == 'dictator_binary':
+                        prompt_params_dict['fairness2'] = 10 - prompt_params_dict['fairness']
+
                     final_prompt = self.game_params[f"prompt_complete"].format(
                         **prompt_params_dict
                     )
@@ -358,7 +366,7 @@ class AiParticipant:
 
         tqdm.pandas(desc="Control questions progress")
 
-        questions = [self.game_params["control_questions"]] * 2  # self.n_control
+        questions = [self.game_params["control_questions"]] * self.n_control
         control_df = pd.DataFrame(questions, columns=["control_question"])
         print("control dataframe created!")
         # Apply the function to the column and create a DataFrame from the resulting dictionaries
@@ -432,6 +440,37 @@ class AiParticipant:
             sep=",",
             index=False,
         )
+
+    def convert_jsonl_answers_to_csv(self, prompt_type: str):
+        """
+        This function converts the jsonl results file back into a csv file for later analysis.
+        We extract responses from the JSON reply from ChatGPT + re-extract the factor levels for
+        experimental prompts
+
+        :param prompt_type: baseline or experimental
+        :return:
+        """
+
+        results_jsonl = os.path.join(prompts_dir, self.game, f'{self.game}_{prompt_type}_results.jsonl')
+        assert os.path.exists(results_jsonl), f'No results file found for {self.game} in {prompt_type} mode!'
+
+        data = []
+        with open(results_jsonl) as f:
+            for line in f:
+
+                single_json_line = json.loads(line)
+                reply, value, finish_reason = single_json_line[1]["choices"][0]["message"]["content"]
+                data.append([
+                    single_json_line[0]["messages"]["content"],  # the full prompt
+                    single_json_line[0]["temperature"],  # temperature
+                    "unprompted",  # age
+                    "unprompted",  # gender
+                    prompt_type,  # prompt_type
+                    self.game,  # game type,
+                    reply,
+                    value,
+                    finish_reason
+                ])
 
     def collect_answers(self, prompt_type: str):
         """
@@ -583,6 +622,7 @@ if __name__ == "__main__":
 
     if args.mode == "convert_prompts_to_json":
         P.convert_data_to_jsonl("baseline")
+        P.convert_data_to_jsonl("experimental")
 
     if args.mode == "send_prompts_baseline":
         P.collect_answers("baseline")
