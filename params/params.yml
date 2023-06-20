@@ -8,6 +8,7 @@ mode_options:
   - test_assumptions
   - prepare_prompts
   - convert_prompts_to_json
+  - convert_jsonl_results_to_csv
   - send_prompts_baseline
   - send_prompts_experimental
 model_options:
