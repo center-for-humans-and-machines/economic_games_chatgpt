@@ -142,12 +142,13 @@ class AiParticipant:
                 engine=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temp,
-                max_tokens=50,
+                max_tokens=150,
                 top_p=1,
                 frequency_penalty=0,
                 presence_penalty=0,
             )
             prompt_response = response["choices"][0]["message"]["content"]
+            print(prompt_response)
             finish_reason = response["choices"][0]["finish_reason"]
             # response returned as json
             prompt_response_dict = json.loads(prompt_response)
@@ -459,18 +460,79 @@ class AiParticipant:
             for line in f:
 
                 single_json_line = json.loads(line)
-                reply, value, finish_reason = single_json_line[1]["choices"][0]["message"]["content"]
-                data.append([
-                    single_json_line[0]["messages"]["content"],  # the full prompt
-                    single_json_line[0]["temperature"],  # temperature
-                    "unprompted",  # age
-                    "unprompted",  # gender
-                    prompt_type,  # prompt_type
-                    self.game,  # game type,
-                    reply,
-                    value,
-                    finish_reason
-                ])
+
+                if prompt_type == 'baseline':
+                    try:
+                        response_dict = json.loads(single_json_line[1]["choices"][0]["message"]["content"])
+                        print(single_json_line[1]["choices"][0]["message"]["content"])
+                    except:
+                        print("Something went wrong")
+                        print(single_json_line[1])
+
+                    if self.game == 'dictator_sender' or self.game == 'ultimatum_sender':
+                        data.append([
+                            single_json_line[0]["messages"][0]["content"],  # the full prompt
+                            single_json_line[0]["temperature"],  # temperature
+                            "unprompted",  # age
+                            "unprompted",  # gender
+                            prompt_type,  # prompt_type
+                            self.game,  # game type,
+                            response_dict['reply'],  # the full response text
+                            response_dict['amount_sent'],  # the integer reply
+                            single_json_line[1]["choices"][0]["finish_reason"]  # finish reason
+                        ])
+
+                    if self.game == 'ultimatum_receiver' or self.game == 'dictator_sequential':
+
+                        if self.game == 'dictator_sequential':
+                            fairness = re.findall(r'\d+', single_json_line[0]["messages"][0]["content"].split('.')[5])
+                            data.append([
+                                single_json_line[0]["messages"][0]["content"],  # the full prompt
+                                single_json_line[0]["temperature"],  # temperature
+                                int(fairness[0]),  # fairness
+                                "unprompted",  # age
+                                "unprompted",  # gender
+                                prompt_type,  # prompt_type
+                                self.game,  # game type,
+                                response_dict['reply'],  # the full response text
+                                response_dict['amount_sent'],  # the integer reply
+                                single_json_line[1]["choices"][0]["finish_reason"]  # finish reason
+                            ])
+                        else:
+                            fairness = re.findall(r'\d+', single_json_line[0]["messages"][0]["content"].split('.')[7])
+                            data.append([
+                                single_json_line[0]["messages"][0]["content"],  # the full prompt
+                                single_json_line[0]["temperature"],  # temperature
+                                int(fairness[0]),  # fairness
+                                "unprompted",  # age
+                                "unprompted",  # gender
+                                prompt_type,  # prompt_type
+                                self.game,  # game type,
+                                response_dict['reply'],  # the full response text
+                                response_dict['decision'],  # the integer reply
+                                single_json_line[1]["choices"][0]["finish_reason"]  # finish reason
+                            ])
+
+
+                elif prompt_type == 'experimental':
+                    reply, value, finish_reason = single_json_line[1]["choices"][0]["message"]["content"]
+                    data.append([
+                        single_json_line[0]["messages"]["content"],  # the full prompt
+                        single_json_line[0]["temperature"],  # temperature
+                        "unprompted",  # age
+                        "unprompted",  # gender
+                        prompt_type,  # prompt_type
+                        self.game,  # game type,
+                        reply,
+                        value,
+                        finish_reason
+                    ])
+
+        # results_df = pd.DataFrame(data, columns=['prompt', 'temperature', 'age', 'gender',
+        #                                          'prompt_type', 'game', 'reply_text', 'value', 'finish_reason'])
+        # # save results as csv
+        # results_df.to_csv(os.path.join(prompts_dir, self.game, f'{self.game}_{prompt_type}_results.csv'),
+        #                   sep=',')
 
     def collect_answers(self, prompt_type: str):
         """
@@ -568,7 +630,11 @@ if __name__ == "__main__":
         type=str,
         help="""
                                 Which economic game do you want to run \n 
-                                (options: dictator_sender, dictator_sequential, dictator_binary, ultimatum_sender, ultimatum_receiver)
+                                (options: dictator_sender, 
+                                          dictator_sequential, 
+                                          dictator_binary, 
+                                          ultimatum_sender, 
+                                          ultimatum_receiver)
                                 """,
         required=True,
     )
@@ -581,7 +647,8 @@ if __name__ == "__main__":
                                           prepare_prompts,
                                           convert_prompts_to_json,
                                           send_prompts_baseline, 
-                                          send_prompts_experimental)
+                                          send_prompts_experimental,
+                                          convert_jsonl_results_to_csv)
                                 """,
         required=True,
     )
@@ -629,3 +696,7 @@ if __name__ == "__main__":
 
     if args.mode == "send_prompts_experimental":
         P.collect_answers("experimental")
+
+    if args.mode == 'convert_jsonl_results_to_csv':
+        P.convert_jsonl_answers_to_csv("baseline")
+        # P.convert_jsonl_answers_to_csv("experimental")
