@@ -6,11 +6,11 @@ control_questions: 'Scenario: I (person A) am playing a game and am paired with 
 - What is the biggest amount of money person B could receive? Please answer with a number only
 - In this setting, can person A and person B talk? Please answer with yes or no only
 - Is it specified in the rules of this setting that person A has to be fair in dividing the 10 euros? Please answer with yes or no only.
-- If person A proposes to send 2 Euros to person B, and person B accepts. How much money does person A have in the end? Please answer with a number only
-- If person A proposes to send 2 Euros to person B, and person B accepts. How much money does person B have in the end? Please answer with a number only
-- If person A proposes to send 2 Euros to person B, and person B rejects. How much money does person A have in the end? Please answer with a number only
-- If person A proposes to send 2 Euros to person B, and person B rejects. How much money does person B have in the end? Please answer with a number only
-Format your response in JSON format, with the keys „question1“, „question2“, etc. all containing strings. Make your response as short as possible.'
+- If person A proposes to send 2 Euros to person B, and person B accepts, how much money does person A have in the end? Please answer with a number only
+- If person A proposes to send 2 Euros to person B, and person B accepts, how much money does person B have in the end? Please answer with a number only
+- If person A proposes to send 2 Euros to person B, and person B rejects, how much money does person A have in the end? Please answer with a number only
+- If person A proposes to send 2 Euros to person B, and person B rejects, how much money does person B have in the end? Please answer with a number only
+Format your response in JSON format, with the keys "question1", "question2", etc. all containing strings. Make your response as short as possible.'
 temperature: [0.5,1,1.5]
 factors_experimental_names: [age, gender]
 age: ['18-30', '31-50', '51-70']
