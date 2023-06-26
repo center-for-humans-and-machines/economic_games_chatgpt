@@ -78,3 +78,9 @@ The parameter file contains all prompts used in the study, organized by differen
 Additionally, the parameter file includes all factors and language model parameters that are used in the study.
 Parameters used include: (work in progress)
 
+
+## Analysis
+- **Analysis 1**: T-test to compare the suggestions sent in DG Sender and in DG Reciprocity.
+- **Analysis 2**: T-test to compare the suggestions sent in DG Sender and in UG Sender. 
+- **Analysis 3A**: Z-test to compare whether the likelihood of rejection of unfair offers (i.e., X = 1; X = 2, and X = 3) is higher in the UG Receiver compared to the binary DG. 
+- **Analysis 3B**: Linear Probability Model (and logit, probit for robustness) with the choice of the option that gives both agents zero euros as the dependent variable to study whether: (i)  rejection rates are decreasing in the fairness of the offer; and (ii) rejections rates are significantly lower in the binary DG (compared to UG Receiver) for low, but not for high offers (regression will exclude data with X = 10). 
