@@ -593,8 +593,6 @@ class AiParticipant:
                 ),
                 "prompt_type": pa.Column(str),
                 "game_type": pa.Column(str),
-                # "n_tokens_davinci": pa.Column(int, pa.Check.between(0, 1000)),
-                # "n_tokens_chatgpt": pa.Column(int, pa.Check.between(0, 1000)),
                 "answer_text": pa.Column(str),
                 "answer": pa.Column(int, pa.Check.between(0, 10), coerce=True),
                 "finish_reason": pa.Column(
