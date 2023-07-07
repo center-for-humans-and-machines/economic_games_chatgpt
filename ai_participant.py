@@ -700,11 +700,15 @@ class AiParticipant:
 
                         else:
                             print(list(response_dict.keys()))
-                            if isinstance(response_dict[list(response_dict.keys())[0]], dict):
+                            if isinstance(
+                                response_dict[list(response_dict.keys())[0]], dict
+                            ):
                                 keys_2 = list(
                                     response_dict[list(response_dict.keys())[0]].keys()
                                 )
-                            elif isinstance(response_dict[list(response_dict.keys())[1]], dict):
+                            elif isinstance(
+                                response_dict[list(response_dict.keys())[1]], dict
+                            ):
                                 keys_2 = list(
                                     response_dict[list(response_dict.keys())[1]].keys()
                                 )
@@ -814,7 +818,6 @@ class AiParticipant:
         # results_df.to_csv(os.path.join(prompts_dir, self.game, f'{self.game}_{prompt_type}_results.csv'),
         #                   sep=',')
 
-
     def try_parsing(self, prompt_type: str):
         results_jsonl = os.path.join(
             prompts_dir, self.game, f"{self.game}_{prompt_type}_results.jsonl"
@@ -826,19 +829,19 @@ class AiParticipant:
         data = []
         exceptions = []
         count_lines_with_problems = 0
-        i=0
+        i = 0
         with open(results_jsonl) as f:
             for line in f:
                 single_json_line = json.loads(line)
                 result = extract_response(single_json_line, self.game, prompt_type)
 
                 print(result)
-                i+=1
-                if i >5:
+                i += 1
+                if i > 5:
                     break
-                #if len(result) == 3:
+                # if len(result) == 3:
                 #    exceptions.append(result)
-                #else:
+                # else:
                 #    data.append(result)
 
     def collect_answers(self, prompt_type: str):
