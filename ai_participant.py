@@ -466,6 +466,7 @@ class AiParticipant:
 
         data = []
         count_lines_with_problems = 0
+        ids_with_problems = []
 
         with open(results_jsonl) as f:
             for line in f:
@@ -480,7 +481,12 @@ class AiParticipant:
                         # print(response_dict, any(isinstance(i,dict) for i in response_dict.values()) )
                         # print(list(response_dict.keys()))
                     except:
-                        print("Something went wrong")
+                        print(
+                            f"Something went wrong (chat completion id: {single_json_line[1]['id']})"
+                        )
+
+                        ids_with_problems.append(single_json_line[1]["id"])
+
                         count_lines_with_problems += 1
                         if "content" in single_json_line[1]["choices"][0]["message"]:
                             print(
@@ -504,6 +510,7 @@ class AiParticipant:
                                     "unprompted",  # gender
                                     prompt_type,  # prompt_type
                                     self.game,  # game type,
+                                    single_json_line[1]["id"],  # the completion id
                                     response_dict[
                                         f'{[i for i in list(response_dict.keys()) if "re" in i or "Re" in i][0]}'
                                     ],
@@ -531,6 +538,7 @@ class AiParticipant:
                                     "unprompted",  # gender
                                     prompt_type,  # prompt_type
                                     self.game,  # game type,
+                                    single_json_line[1]["id"],  # the completion id
                                     response_dict[list(response_dict.keys())[0]][
                                         f'{[i for i in keys_2 if "re" in i or "Re" in i][0]}'
                                     ],
@@ -567,6 +575,7 @@ class AiParticipant:
                                     "unprompted",  # gender
                                     prompt_type,  # prompt_type
                                     self.game,  # game type,
+                                    single_json_line[1]["id"],  # the completion id
                                     # response_dict["reply"],  # the full response text
                                     response_dict[
                                         f'{[i for i in list(response_dict.keys()) if "re" in i or "Re" in i][0]}'
@@ -604,6 +613,7 @@ class AiParticipant:
                                         "unprompted",  # gender
                                         prompt_type,  # prompt_type
                                         self.game,  # game type,
+                                        single_json_line[1]["id"],  # the completion id
                                         response_dict[
                                             f'{[i for i in list(response_dict.keys()) if "re" in i or "Re" in i][0]}'
                                         ],
@@ -635,6 +645,7 @@ class AiParticipant:
                                         "unprompted",  # gender
                                         prompt_type,  # prompt_type
                                         self.game,  # game type,
+                                        single_json_line[1]["id"],  # the completion id
                                         response_dict[list(response_dict.keys())[0]][
                                             f'{[i for i in keys_2 if "re" in i or "Re" in i][0]}'
                                         ],
@@ -648,6 +659,75 @@ class AiParticipant:
                                         ],  # finish reason
                                     ]
                                 )
+
+                    if self.game == "dictator_binary":
+                        fairness = re.findall(
+                            r"\d+",
+                            single_json_line[0]["messages"][0]["content"].split(".")[3],
+                        )
+
+                        print(list(response_dict.keys()))
+                        if len(list(response_dict.keys())) == 1:
+                            print(response_dict)
+
+                            if list(response_dict.keys())[0] == "data":
+                                reply = response_dict["data"]["reply"]
+                                option = response_dict["data"]["option_preferred"]
+                            elif list(response_dict.keys())[0] == "reply":
+                                if "option_preferred" in response_dict["reply"]:
+                                    index = response_dict["reply"].find(
+                                        "option_preferred"
+                                    )
+                                    reply = response_dict["reply"]
+                                    option = re.findall(
+                                        r"\d+", response_dict["reply"][index:]
+                                    )[0]
+                                    print(option)
+
+                            data.append(
+                                [
+                                    single_json_line[0]["messages"][0][
+                                        "content"
+                                    ],  # the full prompt
+                                    single_json_line[0]["temperature"],  # temperature
+                                    int(fairness[0]),  # fairness
+                                    "unprompted",  # age
+                                    "unprompted",  # gender
+                                    prompt_type,  # prompt_type
+                                    self.game,  # game type,
+                                    single_json_line[1]["id"],  # the completion id
+                                    reply,
+                                    option,
+                                    single_json_line[1]["choices"][0][
+                                        "finish_reason"
+                                    ],  # finish reason
+                                ]
+                            )
+
+                        else:
+                            data.append(
+                                [
+                                    single_json_line[0]["messages"][0][
+                                        "content"
+                                    ],  # the full prompt
+                                    single_json_line[0]["temperature"],  # temperature
+                                    int(fairness[0]),  # fairness
+                                    "unprompted",  # age
+                                    "unprompted",  # gender
+                                    prompt_type,  # prompt_type
+                                    self.game,  # game type,
+                                    single_json_line[1]["id"],  # the completion id
+                                    response_dict[
+                                        f'{[i for i in list(response_dict.keys()) if "re" in i or "Re" in i][0]}'
+                                    ],
+                                    response_dict[
+                                        f'{[i for i in list(response_dict.keys()) if "option" in i][0]}'
+                                    ],
+                                    single_json_line[1]["choices"][0][
+                                        "finish_reason"
+                                    ],  # finish reason
+                                ]
+                            )
 
                 elif prompt_type == "experimental":
                     try:
@@ -666,14 +746,87 @@ class AiParticipant:
                         gender = demographic_words[-1]
 
                     except:
-                        print("Something went wrong")
-                        print(single_json_line[1])
+                        print(
+                            f"Something went wrong (chat completion id: {single_json_line[1]['id']})"
+                        )
+
+                        ids_with_problems.append(single_json_line[1]["id"])
                         count_lines_with_problems += 1
+
+                    if self.game == "dictator_binary":
+                        fairness = re.findall(
+                            r"\d+",
+                            single_json_line[0]["messages"][0]["content"].split(".")[3],
+                        )
+
+                        print(list(response_dict.keys()))
+                        if len(list(response_dict.keys())) == 1:
+                            print(response_dict)
+
+                            if list(response_dict.keys())[0] == "data":
+                                reply = response_dict["data"]["reply"]
+                                option = response_dict["data"]["option_preferred"]
+                            elif list(response_dict.keys())[0] == "reply":
+                                if "option_preferred" in response_dict["reply"]:
+                                    index = response_dict["reply"].find(
+                                        "option_preferred"
+                                    )
+                                    reply = response_dict["reply"]
+                                    option = re.findall(
+                                        r"\d+", response_dict["reply"][index:]
+                                    )[0]
+                                    print(option)
+
+                            data.append(
+                                [
+                                    single_json_line[0]["messages"][0][
+                                        "content"
+                                    ],  # the full prompt
+                                    single_json_line[0]["temperature"],  # temperature
+                                    int(fairness[0]),  # fairness
+                                    age,  # age
+                                    gender,  # gender
+                                    prompt_type,  # prompt_type
+                                    self.game,  # game type,
+                                    single_json_line[1]["id"],  # the completion id
+                                    reply,
+                                    option,
+                                    single_json_line[1]["choices"][0][
+                                        "finish_reason"
+                                    ],  # finish reason
+                                ]
+                            )
+
+                        else:
+                            data.append(
+                                [
+                                    single_json_line[0]["messages"][0][
+                                        "content"
+                                    ],  # the full prompt
+                                    single_json_line[0]["temperature"],  # temperature
+                                    int(fairness[0]),  # fairness
+                                    age,  # age
+                                    gender,  # gender
+                                    prompt_type,  # prompt_type
+                                    self.game,  # game type,
+                                    single_json_line[1]["id"],  # the completion id
+                                    response_dict[
+                                        f'{[i for i in list(response_dict.keys()) if "re" in i or "Re" in i][0]}'
+                                    ],
+                                    response_dict[
+                                        f'{[i for i in list(response_dict.keys()) if "option" in i or "opinion" in i or "preferred" in i or "expression" in i][0]}'
+                                    ],
+                                    single_json_line[1]["choices"][0][
+                                        "finish_reason"
+                                    ],  # finish reason
+                                ]
+                            )
 
                     if (
                         self.game == "dictator_sender"
                         or self.game == "ultimatum_sender"
                     ):
+                        print(response_dict)
                         if not any(isinstance(i, dict) for i in response_dict.values()):
                             data.append(
                                 [
@@ -685,12 +838,13 @@ class AiParticipant:
                                     gender,  # gender
                                     prompt_type,  # prompt_type
                                     self.game,  # game type,
+                                    single_json_line[1]["id"],  # the completion id
                                     response_dict[
                                         f'{[i for i in list(response_dict.keys()) if "re" in i or "Re" in i][0]}'
                                     ],
                                     # response_dict["reply"],  # the full response text
                                     response_dict[
-                                        f'{[i for i in list(response_dict.keys()) if "amount" in i or "money" in i or "sent" in i or "Sent" in i][0]}'
+                                        f'{[i for i in list(response_dict.keys()) if "amount" in i or "money" in i or "sent" in i or "Sent" in i or "suggestion" in i][0]}'
                                     ],
                                     single_json_line[1]["choices"][0][
                                         "finish_reason"
@@ -703,49 +857,81 @@ class AiParticipant:
                             if isinstance(
                                 response_dict[list(response_dict.keys())[0]], dict
                             ):
+                                keys_2_index = 0
                                 keys_2 = list(
                                     response_dict[list(response_dict.keys())[0]].keys()
                                 )
                             elif isinstance(
                                 response_dict[list(response_dict.keys())[1]], dict
                             ):
+                                keys_2_index = 1
                                 keys_2 = list(
                                     response_dict[list(response_dict.keys())[1]].keys()
                                 )
+                            print(keys_2, keys_2_index)
+                            print(
+                                response_dict[list(response_dict.keys())[keys_2_index]]
+                            )
+
+                            # we have two edge cases
+                            # 1) {'reply':.., 'answer':{'amount_sent':..}} or {'reply':.., 'suggestion':{'amount_sent':..}}
+                            # 2) {'answer': {'reply': ..., 'amount_sent': ...}}
 
                             if len(keys_2) == 1:
-                                print(keys_2)
-                            elif len(keys_2) == 2:
-                                for k in keys_2:
-                                    print(
-                                        k,
-                                        any(
-                                            isinstance(i, dict)
-                                            for i in response_dict[k]
-                                        ),
-                                    )
-
-                            data.append(
-                                [
-                                    single_json_line[0]["messages"][0][
-                                        "content"
-                                    ],  # the full prompt
-                                    single_json_line[0]["temperature"],  # temperature
-                                    age,  # age
-                                    gender,  # gender
-                                    prompt_type,  # prompt_type
-                                    self.game,  # game type,
-                                    response_dict[list(response_dict.keys())[0]][
-                                        f'{[i for i in keys_2 if "re" in i or "Re" in i][0]}'
-                                    ],
-                                    response_dict[list(response_dict.keys())[0]][
-                                        f'{[i for i in keys_2 if "amount" in i or "money" in i or "sent" in i or "Sent" in i][0]}'
-                                    ],
-                                    single_json_line[1]["choices"][0][
-                                        "finish_reason"
-                                    ],  # finish reason
+                                reply = response_dict[
+                                    f'{[i for i in list(response_dict.keys()) if "re" in i or "Re" in i][0]}'
                                 ]
-                            )
+                                data.append(
+                                    [
+                                        single_json_line[0]["messages"][0][
+                                            "content"
+                                        ],  # the full prompt
+                                        single_json_line[0][
+                                            "temperature"
+                                        ],  # temperature
+                                        age,  # age
+                                        gender,  # gender
+                                        prompt_type,  # prompt_type
+                                        self.game,  # game type,
+                                        single_json_line[1]["id"],  # the completion id
+                                        reply,
+                                        response_dict[
+                                            list(response_dict.keys())[keys_2_index]
+                                        ][
+                                            f'{[i for i in keys_2 if "amount" in i or "money" in i or "sent" in i or "Sent" in i][0]}'
+                                        ],
+                                        single_json_line[1]["choices"][0][
+                                            "finish_reason"
+                                        ],  # finish reason
+                                    ]
+                                )
+
+                            elif len(keys_2) == 2:
+                                reply = response_dict[list(response_dict.keys())[0]][
+                                    f'{[i for i in keys_2 if "re" in i or "Re" in i][0]}'
+                                ]
+                                data.append(
+                                    [
+                                        single_json_line[0]["messages"][0][
+                                            "content"
+                                        ],  # the full prompt
+                                        single_json_line[0][
+                                            "temperature"
+                                        ],  # temperature
+                                        age,  # age
+                                        gender,  # gender
+                                        prompt_type,  # prompt_type
+                                        self.game,  # game type,
+                                        single_json_line[1]["id"],  # the completion id
+                                        reply,
+                                        response_dict[list(response_dict.keys())[0]][
+                                            f'{[i for i in keys_2 if "amount" in i or "money" in i or "sent" in i or "Sent" in i][0]}'
+                                        ],
+                                        single_json_line[1]["choices"][0][
+                                            "finish_reason"
+                                        ],  # finish reason
+                                    ]
+                                )
 
                     if (
                         self.game == "ultimatum_receiver"
@@ -758,65 +944,298 @@ class AiParticipant:
                                     "."
                                 )[5],
                             )
-                            data.append(
-                                [
-                                    single_json_line[0]["messages"][0][
-                                        "content"
-                                    ],  # the full prompt
-                                    single_json_line[0]["temperature"],  # temperature
-                                    int(fairness[0]),  # fairness
-                                    age,  # age
-                                    gender,  # gender
-                                    prompt_type,  # prompt_type
-                                    self.game,  # game type,
-                                    # response_dict["reply"],  # the full response text
+
+                            if not any(
+                                isinstance(i, dict) for i in response_dict.values()
+                            ):
+                                print(response_dict)
+                                if len(response_dict) > 1:
+                                    data.append(
+                                        [
+                                            single_json_line[0]["messages"][0][
+                                                "content"
+                                            ],  # the full prompt
+                                            single_json_line[0][
+                                                "temperature"
+                                            ],  # temperature
+                                            int(fairness[0]),  # fairness
+                                            age,  # age
+                                            gender,  # gender
+                                            prompt_type,  # prompt_type
+                                            self.game,  # game type,
+                                            single_json_line[1][
+                                                "id"
+                                            ],  # the completion id
+                                            # response_dict["reply"],  # the full response text
+                                            response_dict[
+                                                f'{[i for i in list(response_dict.keys()) if "reply" in i or "Reply" in i or "reponse" in i or "response" in i][0]}'
+                                            ],
+                                            response_dict[
+                                                f'{[i for i in list(response_dict.keys()) if "amount" in i or "money" in i or "sent" in i or "Sent" in i or "suggestion" in i][0]}'
+                                            ],
+                                            single_json_line[1]["choices"][0][
+                                                "finish_reason"
+                                            ],  # finish reason
+                                        ]
+                                    )
+                                else:
+                                    ids_with_problems.append(single_json_line[1]["id"])
+
+                            else:
+                                # for edge cases
+                                if isinstance(
+                                    response_dict[list(response_dict.keys())[0]], dict
+                                ):
+                                    keys_2_index = 0
+                                    keys_2 = list(
+                                        response_dict[
+                                            list(response_dict.keys())[0]
+                                        ].keys()
+                                    )
+                                elif isinstance(
+                                    response_dict[list(response_dict.keys())[1]], dict
+                                ):
+                                    keys_2_index = 1
+                                    keys_2 = list(
+                                        response_dict[
+                                            list(response_dict.keys())[1]
+                                        ].keys()
+                                    )
+                                print(keys_2, keys_2_index)
+                                print(
                                     response_dict[
-                                        f'{[i for i in list(response_dict.keys()) if i.startswith("r")][0]}'
-                                    ],
-                                    response_dict["amount_sent"],  # the integer reply
-                                    single_json_line[1]["choices"][0][
-                                        "finish_reason"
-                                    ],  # finish reason
-                                ]
-                            )
+                                        list(response_dict.keys())[keys_2_index]
+                                    ]
+                                )
+
+                                if len(keys_2) == 1:
+                                    reply = response_dict[
+                                        f'{[i for i in list(response_dict.keys()) if "re" in i or "Re" in i][0]}'
+                                    ]
+
+                                    data.append(
+                                        [
+                                            single_json_line[0]["messages"][0][
+                                                "content"
+                                            ],  # the full prompt
+                                            single_json_line[0][
+                                                "temperature"
+                                            ],  # temperature
+                                            int(fairness[0]),  # fairness
+                                            age,  # age
+                                            gender,  # gender
+                                            prompt_type,  # prompt_type
+                                            self.game,  # game type,
+                                            single_json_line[1][
+                                                "id"
+                                            ],  # the completion id
+                                            reply,
+                                            response_dict[
+                                                list(response_dict.keys())[keys_2_index]
+                                            ][
+                                                f'{[i for i in keys_2 if "amount" in i or "money" in i or "sent" in i or "Sent" in i][0]}'
+                                            ],
+                                            single_json_line[1]["choices"][0][
+                                                "finish_reason"
+                                            ],  # finish reason
+                                        ]
+                                    )
+                                elif len(keys_2) == 2:
+                                    reply = response_dict[
+                                        list(response_dict.keys())[0]
+                                    ][
+                                        f'{[i for i in keys_2 if "re" in i or "Re" in i][0]}'
+                                    ]
+
+                                    data.append(
+                                        [
+                                            single_json_line[0]["messages"][0][
+                                                "content"
+                                            ],  # the full prompt
+                                            single_json_line[0][
+                                                "temperature"
+                                            ],  # temperature
+                                            age,  # age
+                                            gender,  # gender
+                                            prompt_type,  # prompt_type
+                                            self.game,  # game type,
+                                            single_json_line[1][
+                                                "id"
+                                            ],  # the completion id
+                                            reply,
+                                            response_dict[
+                                                list(response_dict.keys())[0]
+                                            ][
+                                                f'{[i for i in keys_2 if "amount" in i or "money" in i or "sent" in i or "Sent" in i][0]}'
+                                            ],
+                                            single_json_line[1]["choices"][0][
+                                                "finish_reason"
+                                            ],  # finish reason
+                                        ]
+                                    )
+
                         else:
                             fairness = re.findall(
                                 r"\d+",
                                 single_json_line[0]["messages"][0]["content"].split(
                                     "."
-                                )[7],
+                                )[8],
                             )
-                            data.append(
-                                [
-                                    single_json_line[0]["messages"][0][
-                                        "content"
-                                    ],  # the full prompt
-                                    single_json_line[0]["temperature"],  # temperature
-                                    int(fairness[0]),  # fairness
-                                    age,  # age
-                                    gender,  # gender
-                                    prompt_type,  # prompt_type
-                                    self.game,  # game type,
-                                    # response_dict["reply"],  # the full response text
-                                    response_dict[
-                                        f'{[i for i in list(response_dict.keys()) if "re" in i][0]}'
-                                    ],
-                                    response_dict["decision"],  # the integer reply
-                                    single_json_line[1]["choices"][0][
-                                        "finish_reason"
-                                    ],  # finish reason
-                                ]
-                            )
+
+                            if not any(
+                                isinstance(i, dict) for i in response_dict.values()
+                            ):
+                                print(response_dict)
+
+                                # for edge case {'response': [{'reply': 'Yes, you should accept.'}, {'decision': 1}]}
+                                # and edge case {'response': [{'reply': 'Yes you should accept', 'decision': 1}]}
+                                if any(
+                                    isinstance(i, list) for i in response_dict.values()
+                                ):
+                                    if len(response_dict["response"]) > 1:
+                                        data.append(
+                                            [
+                                                single_json_line[0]["messages"][0][
+                                                    "content"
+                                                ],  # the full prompt
+                                                single_json_line[0][
+                                                    "temperature"
+                                                ],  # temperature
+                                                int(fairness[0]),  # fairness
+                                                age,  # age
+                                                gender,  # gender
+                                                prompt_type,  # prompt_type
+                                                self.game,  # game type,
+                                                single_json_line[1][
+                                                    "id"
+                                                ],  # the completion id
+                                                # response_dict["reply"],  # the full response text
+                                                response_dict["response"][0]["reply"],
+                                                response_dict["response"][1][
+                                                    "decision"
+                                                ],
+                                                single_json_line[1]["choices"][0][
+                                                    "finish_reason"
+                                                ],  # finish reason
+                                            ]
+                                        )
+                                    else:
+                                        data.append(
+                                            [
+                                                single_json_line[0]["messages"][0][
+                                                    "content"
+                                                ],  # the full prompt
+                                                single_json_line[0][
+                                                    "temperature"
+                                                ],  # temperature
+                                                int(fairness[0]),  # fairness
+                                                age,  # age
+                                                gender,  # gender
+                                                prompt_type,  # prompt_type
+                                                self.game,  # game type,
+                                                single_json_line[1][
+                                                    "id"
+                                                ],  # the completion id
+                                                # response_dict["reply"],  # the full response text
+                                                response_dict["response"][0]["reply"],
+                                                response_dict["response"][0][
+                                                    "decision"
+                                                ],
+                                                single_json_line[1]["choices"][0][
+                                                    "finish_reason"
+                                                ],  # finish reason
+                                            ]
+                                        )
+
+                                else:
+                                    data.append(
+                                        [
+                                            single_json_line[0]["messages"][0][
+                                                "content"
+                                            ],  # the full prompt
+                                            single_json_line[0][
+                                                "temperature"
+                                            ],  # temperature
+                                            int(fairness[0]),  # fairness
+                                            age,  # age
+                                            gender,  # gender
+                                            prompt_type,  # prompt_type
+                                            self.game,  # game type,
+                                            single_json_line[1][
+                                                "id"
+                                            ],  # the completion id
+                                            # response_dict["reply"],  # the full response text
+                                            response_dict[
+                                                f'{[i for i in list(response_dict.keys()) if "re" in i or "stringResponse" in i or "Reply" in i][0]}'
+                                            ],
+                                            response_dict[
+                                                f'{[i for i in list(response_dict.keys()) if "decision" in i or "appraisal" in i or "suggestion" in i or "descision" in i or "result" in i or "decison" in i or "Decision" in i][0]}'
+                                            ],  # the integer reply
+                                            single_json_line[1]["choices"][0][
+                                                "finish_reason"
+                                            ],  # finish reason
+                                        ]
+                                    )
 
         print(
             "Number of responses with problems in json parsing: ",
             count_lines_with_problems,
         )
-        # results_df = pd.DataFrame(data, columns=['prompt', 'temperature', 'age', 'gender',
-        #                                          'prompt_type', 'game', 'reply_text', 'value', 'finish_reason'])
-        # # save results as csv
-        # results_df.to_csv(os.path.join(prompts_dir, self.game, f'{self.game}_{prompt_type}_results.csv'),
-        #                   sep=',')
+
+        # save completion ids with problems (to be checked manually)
+        with open(
+            os.path.join(
+                prompts_dir,
+                self.game,
+                f"{self.game}_{prompt_type}_completion_ids_to_check.txt",
+            ),
+            "w",
+        ) as f:
+            for line in ids_with_problems:
+                f.write(f"{line}\n")
+
+        print(f"Number of columns present in the dataset: {len(data[0])}")
+
+        if self.game in ["dictator_sender", "ultimatum_sender"]:
+            results_df = pd.DataFrame(
+                data,
+                columns=[
+                    "prompt",
+                    "temperature",
+                    "age",
+                    "gender",
+                    "prompt_type",
+                    "game",
+                    "completion_id",
+                    "reply_text",
+                    "value",
+                    "finish_reason",
+                ],
+            )
+        else:
+            results_df = pd.DataFrame(
+                data,
+                columns=[
+                    "prompt",
+                    "temperature",
+                    "fairness",
+                    "age",
+                    "gender",
+                    "prompt_type",
+                    "game",
+                    "completion_id",
+                    "reply_text",
+                    "value",
+                    "finish_reason",
+                ],
+            )
+        # save results as csv
+        results_df.to_csv(
+            os.path.join(
+                prompts_dir, self.game, f"{self.game}_{prompt_type}_results.csv"
+            ),
+            sep=",",
+        )
 
     def try_parsing(self, prompt_type: str):
         results_jsonl = os.path.join(
@@ -1008,6 +1427,6 @@ if __name__ == "__main__":
         P.collect_answers("experimental")
 
     if args.mode == "convert_jsonl_results_to_csv":
-        P.try_parsing("baseline")
+        # P.try_parsing("baseline")
         # P.convert_jsonl_answers_to_csv("baseline")
-        # P.convert_jsonl_answers_to_csv("experimental")
+        P.convert_jsonl_answers_to_csv("experimental")
