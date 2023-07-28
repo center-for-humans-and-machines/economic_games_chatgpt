@@ -1,6 +1,6 @@
 # economic_games_chatgpt
 ![example workflow](https://github.com/SaraBonati/economic_games_chatgpt/actions/workflows/black.yml/badge.svg)
-## Setting up the repository
+## Setting up the virtual environment
 
 We use Python version 3.10.8 to create a virtual environment to be used in this project
 
@@ -25,6 +25,8 @@ of the repository
 OPENAI_API_KEY=<your_api_key_here>
 ```
 
+At CHM an Azure OpenAI instance of the `gpt-3.5-turbo` model is available with an API key. 
+
 ## Running the analysis script
 
 In order to run the analysis script `ai_participant.py` specify the economic game, the action you want to perform and the type
@@ -48,10 +50,10 @@ The action to perform can be one of the following options:
 
 The language model type can be one of the following options:
 
-* `text-davinci-003` (refers to the text-davinci class of language models, in particular this option stands for `text-davinci-003`)
+* `text-davinci-003` (refers to the text-davinci class of language models, in particular this option stands for `text-davinci-003`) *NOTE: DISCARDED*
 * `gpt-35-turbo` (refers to the `gpt-3.5-turbo` language model)
 
-E.g. run the script on the trust game from the sender perspective, send all prompts to the language model and save responses
+E.g. run the script locally on the trust game from the sender perspective, send all prompts to the language model and save responses
 ```
 (.venv) python ai_participant.py --game trust_sender --mode send_prompts --model gpt-35-turbo
 ```
@@ -63,7 +65,7 @@ provided by OpenAI (see https://github.com/openai/openai-cookbook/blob/main/exam
 allows parallel api requests using async.
 
 Note that using this method requires data to be organized in a jsonl file, where each line contains the prompt to send
-and metadata such as temperature or frequency penalty.
+and metadata such as temperature or frequency penalty (the jsonl file can be prepared beforehand using the `ai_participant.py` script).
 
 To run the script `api_helper.py` on EC2 navigate to your project directory and execute the following command on the EC2 terminal (the language model used
 by default is `gpt-35-turbo`, and we explicitly say whether we want to collect the baseline or experimental prompts)
@@ -76,11 +78,11 @@ by default is `gpt-35-turbo`, and we explicitly say whether we want to collect t
 For each game a parameter file in the `params` folder of the repository is created.
 The parameter file contains all prompts used in the study, organized by different languages and by prompt type (baseline or experimental).
 Additionally, the parameter file includes all factors and language model parameters that are used in the study.
-Parameters used include: (work in progress)
 
+## Data files 
 
-## Analysis
-- **Analysis 1**: T-test to compare the suggestions sent in DG Sender and in DG Reciprocity.
-- **Analysis 2**: T-test to compare the suggestions sent in DG Sender and in UG Sender. 
-- **Analysis 3A**: Z-test to compare whether the likelihood of rejection of unfair offers (i.e., X = 1; X = 2, and X = 3) is higher in the UG Receiver compared to the binary DG. 
-- **Analysis 3B**: Linear Probability Model (and logit, probit for robustness) with the choice of the option that gives both agents zero euros as the dependent variable to study whether: (i)  rejection rates are decreasing in the fairness of the offer; and (ii) rejections rates are significantly lower in the binary DG (compared to UG Receiver) for low, but not for high offers (regression will exclude data with X = 10). 
+Each economic game will be associated to a set of data files:
+* `{game}_{exp_type}_prompts` : this contains the prompts that have been sent to the language model, in csv and jsonl format
+* `{game}_{exp_type}_results` : this contains the results for each prompt, in csv and jsonl format (results include also the original metadata like temperature or age/gender levels for each prompt)
+* `{game}_{exp_type}_completion_ids_to_check` these txt files give a list of the completion ids (response ids) that Python didn't manage to parse in json format. Despite asking the language model to return responses in json format, sometimes the response returned donesn't follow json syntax, and is not recognized by Python.
+For these ids manual check in the corresponding jsonl result file is needed to see if a response can be still extracted or not.
