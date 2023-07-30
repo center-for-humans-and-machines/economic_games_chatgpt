@@ -316,11 +316,13 @@ class AiParticipant:
         if not os.path.exists(os.path.join(prompts_dir, self.game)):
             os.makedirs(os.path.join(prompts_dir, self.game))
         baseline_df.to_csv(
-            os.path.join(prompts_dir, self.game, f"{self.game}_baseline_prompts.csv")
+            os.path.join(
+                prompts_dir, self.game, f"{self.game}_baseline_prompts_FIX.csv"
+            )
         )
         experimental_df.to_csv(
             os.path.join(
-                prompts_dir, self.game, f"{self.game}_experimental_prompts.csv"
+                prompts_dir, self.game, f"{self.game}_experimental_prompts_FIX.csv"
             )
         )
 
@@ -942,7 +944,7 @@ class AiParticipant:
                                 r"\d+",
                                 single_json_line[0]["messages"][0]["content"].split(
                                     "."
-                                )[5],
+                                )[6],
                             )
 
                             if not any(
@@ -1212,6 +1214,30 @@ class AiParticipant:
                     "finish_reason",
                 ],
             )
+
+            # new! exclude rows when the field is empty and when the number in the field does not make sense.
+            # (this exclusion is game specific)
+            if self.game == "dictator_sender":
+                # response at index 25541 in the jsonl file has /r character that broke response in two parts,
+                # adjust here
+                results_df = results_df[~results_df["completion_id"].isnull()]
+                results_df.iloc[25534, -2] = 5
+                results_df.iloc[25534, -1] = "stop"
+
+                results_df["value"] = pd.to_numeric(
+                    results_df["value"], errors="coerce"
+                )
+                results_df = results_df[
+                    results_df["value"].between(0, 10, inclusive="both")
+                ]
+            if self.game == "ultimatum_sender":
+                results_df["value"] = pd.to_numeric(
+                    results_df["value"], errors="coerce"
+                )
+                results_df = results_df[
+                    results_df["value"].between(0, 10, inclusive="both")
+                ]
+
         else:
             results_df = pd.DataFrame(
                 data,
@@ -1229,10 +1255,31 @@ class AiParticipant:
                     "finish_reason",
                 ],
             )
+
+            # new! exclude rows when the field is empty and when the number in the field does not make sense.
+            # (this exclusion is game specific)
+            if self.game == "dictator_binary":
+                results_df["value"] = pd.to_numeric(
+                    results_df["value"], errors="coerce"
+                )
+                results_df = results_df[results_df["value"].isin([1, 2, 1.0, 2.0])]
+            if self.game == "ultimatum_receiver":
+                results_df["value"] = pd.to_numeric(
+                    results_df["value"], errors="coerce"
+                )
+                results_df = results_df[results_df["value"].isin([1, 0, 1.0, 0.0])]
+            if self.game == "dictator_sequential":
+                results_df["value"] = pd.to_numeric(
+                    results_df["value"], errors="coerce"
+                )
+                results_df = results_df[
+                    results_df["value"].between(0, 10, inclusive="both")
+                ]
+
         # save results as csv
         results_df.to_csv(
             os.path.join(
-                prompts_dir, self.game, f"{self.game}_{prompt_type}_results.csv"
+                prompts_dir, self.game, f"{self.game}_{prompt_type}_results_FIX.csv"
             ),
             sep=",",
         )
@@ -1427,6 +1474,5 @@ if __name__ == "__main__":
         P.collect_answers("experimental")
 
     if args.mode == "convert_jsonl_results_to_csv":
-        # P.try_parsing("baseline")
         # P.convert_jsonl_answers_to_csv("baseline")
         P.convert_jsonl_answers_to_csv("experimental")
