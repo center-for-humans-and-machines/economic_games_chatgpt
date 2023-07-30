@@ -209,3 +209,7 @@ fabric.properties
 
 # Mac files
 *.DS_Store
+
+# test files for quick data interaction
+*_test.py
+*_test.ipynb
