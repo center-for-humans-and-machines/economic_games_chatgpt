@@ -758,7 +758,7 @@ class AiParticipant:
                     if self.game == "dictator_binary":
                         fairness = re.findall(
                             r"\d+",
-                            single_json_line[0]["messages"][0]["content"].split(".")[3],
+                            single_json_line[0]["messages"][0]["content"].split(".")[4],
                         )
 
                         print(list(response_dict.keys()))
@@ -1464,7 +1464,7 @@ if __name__ == "__main__":
         P.adjust_prompts()
 
     if args.mode == "convert_prompts_to_json":
-        P.convert_data_to_jsonl("baseline")
+        # P.convert_data_to_jsonl("baseline")
         P.convert_data_to_jsonl("experimental")
 
     if args.mode == "send_prompts_baseline":
